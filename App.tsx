@@ -1,0 +1,342 @@
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Note, Folder, TextBlock } from './types';
+import { useNoteTaker } from './hooks/useNoteTaker';
+import Sidebar from './components/Sidebar';
+import NoteStream from './components/NoteStream';
+import NoteEditor from './components/NoteEditor';
+import { supabase } from './supabaseClient';
+import { Session } from '@supabase/supabase-js';
+import Auth from './components/Auth';
+import Logo from './components/Logo';
+import { useTheme } from './hooks/useTheme';
+import { useViewMode } from './hooks/useViewMode';
+import { FOLDER_COLOR_VALUES } from './constants';
+import { useNoteColorLabels } from './hooks/useNoteColorLabels';
+
+export interface NoteWithFolder extends Note {
+  folderId: string;
+  folderColorIndex?: number;
+}
+
+const getPlainText = (html: string | undefined): string => {
+    if (!html) return '';
+    try {
+        return html.replace(/<[^>]+>/g, '');
+    } catch (e) {
+        console.error("Error parsing HTML for plain text", e);
+        return '';
+    }
+};
+
+const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    }).catch(error => {
+      const errorMessage = error && typeof error === 'object' && 'message' in error
+        ? (error as { message: string }).message
+        : String(error);
+
+      console.error('Failed to connect to Supabase:', errorMessage);
+      console.error('Full connection error details:', error);
+      
+      setNetworkError('Could not connect to the database. This might be a temporary issue. Please check your internet connection and try refreshing the page.');
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) setNetworkError(null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+     return (
+      <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
+        <div className="text-xl font-semibold font-sans text-charcoal dark:text-text-dark">Connecting...</div>
+      </div>
+    );
+  }
+  
+  if (networkError && !session) {
+    return (
+       <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
+        <div className="max-w-md p-8 bg-white dark:bg-charcoal-dark rounded-xl shadow-soft border border-coral text-center">
+            <h1 className="text-xl font-bold font-sans text-coral mb-3">Connection Error</h1>
+            <p className="text-charcoal/80 dark:text-text-dark/80">{networkError}</p>
+            <button onClick={() => window.location.reload()} className="mt-6 px-5 py-2 bg-accent text-white font-semibold rounded-lg hover:bg-accent/90 transition-colors">
+                Refresh Page
+            </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  return <NotaApp session={session} />;
+};
+
+interface NotaAppProps {
+  session: Session;
+}
+
+const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
+  const { folders, loading, error: noteTakerError, addFolder, deleteFolder, updateFolder, reorderFolders, addNote, deleteNote, updateNote, togglePinNote, moveNote } = useNoteTaker(session);
+  const [theme, toggleTheme] = useTheme();
+  const [viewMode, toggleViewMode] = useViewMode();
+  const [showNoteColorLabels, toggleShowNoteColorLabels] = useNoteColorLabels();
+  
+  const [activeFolderId, setActiveFolderId] = useState<string>('all');
+  const [activeNote, setActiveNote] = useState<NoteWithFolder | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const initialUrlChecked = useRef(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
+  const LOADING_MESSAGES = [
+    "Loading your notes...",
+    "Waking up the database...",
+    "Organizing your thoughts...",
+    "Fetching your latest edits...",
+    "This can take a moment if the server was sleeping.",
+    "Almost there...",
+  ];
+
+  useEffect(() => {
+    let interval: number;
+    if (loading) {
+      interval = window.setInterval(() => {
+        setLoadingMessageIndex(prevIndex => (prevIndex + 1) % LOADING_MESSAGES.length);
+      }, 3000);
+    }
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+    };
+  }, [loading]);
+
+  const allNotes: NoteWithFolder[] = useMemo(() => {
+    return folders
+      .flatMap((f, folderIndex) =>
+        f.notes.map((n) => ({
+          ...n,
+          folderId: f.id,
+          folderColorIndex: f.color_index ?? folderIndex % FOLDER_COLOR_VALUES.length,
+        }))
+      )
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  }, [folders]);
+
+  useEffect(() => {
+    if (!loading && allNotes.length > 0 && !initialUrlChecked.current) {
+        const hash = window.location.hash;
+        const noteIdMatch = hash.match(/^#\/note\/(.+)$/);
+        if (noteIdMatch) {
+            const noteId = noteIdMatch[1];
+            const noteToOpen = allNotes.find(n => n.id === noteId);
+            if (noteToOpen) {
+                setActiveNote(noteToOpen);
+            }
+        }
+        initialUrlChecked.current = true;
+    }
+  }, [loading, allNotes]);
+
+  useEffect(() => {
+    setActiveNote(currentActiveNote => {
+      if (!currentActiveNote) return null;
+      const updatedNoteInList = allNotes.find(n => n.id === currentActiveNote.id);
+      if (!updatedNoteInList) {
+          return null; // Note was deleted
+      }
+      if (JSON.stringify(updatedNoteInList) !== JSON.stringify(currentActiveNote)) {
+        return updatedNoteInList;
+      }
+      return currentActiveNote;
+    });
+  }, [allNotes]);
+
+
+  const filteredNotes = useMemo(() => {
+    let notesToFilter: NoteWithFolder[];
+
+    if (activeFolderId === 'all') {
+      notesToFilter = allNotes;
+    } else {
+      const folder = folders.find(f => f.id === activeFolderId);
+      notesToFilter = folder ? folder.notes.map(n => {
+        const folderIndex = folders.findIndex(fo => fo.id === folder.id);
+        const nonNegativeFolderIndex = folderIndex < 0 ? 0 : folderIndex;
+        return {
+          ...n,
+          folderId: folder.id,
+          folderColorIndex: folder.color_index ?? (nonNegativeFolderIndex % FOLDER_COLOR_VALUES.length)
+        };
+      }) : [];
+    }
+
+    if (!searchQuery.trim()) {
+      return notesToFilter;
+    }
+
+    const lowerCaseQuery = searchQuery.toLowerCase();
+
+    return notesToFilter.filter(note => {
+      const textContent = note.content
+        .filter(block => block.type === 'text')
+        .map(textBlock => getPlainText((textBlock as TextBlock).content))
+        .join(' ');
+      
+      const titleMatch = note.title.toLowerCase().includes(lowerCaseQuery);
+      const contentMatch = textContent.toLowerCase().includes(lowerCaseQuery);
+      
+      return titleMatch || contentMatch;
+    });
+  }, [allNotes, activeFolderId, folders, searchQuery]);
+
+  const handleSelectNote = (note: NoteWithFolder) => {
+    setActiveNote(note);
+    window.location.hash = `#/note/${note.id}`;
+  };
+
+  const handleAddNote = async () => {
+    let targetFolderId = activeFolderId;
+    if (activeFolderId === 'all') {
+        const quickNotesFolder = folders.find(f => f.name === 'Quick Notes');
+        targetFolderId = quickNotesFolder ? quickNotesFolder.id : (folders[0]?.id || null);
+    }
+
+    if (targetFolderId) {
+        const result = await addNote(targetFolderId);
+        if (result) {
+          const folder = folders.find(f => f.id === result.folderId);
+          const folderIndex = folders.findIndex(f => f.id === result.folderId);
+          const nonNegativeFolderIndex = folderIndex < 0 ? 0 : folderIndex;
+          const newNoteWithFolder = {
+              ...result.note,
+              folderId: result.folderId,
+              folderColorIndex: folder?.color_index ?? (nonNegativeFolderIndex % FOLDER_COLOR_VALUES.length)
+          };
+          setActiveNote(newNoteWithFolder);
+          window.location.hash = `#/note/${newNoteWithFolder.id}`;
+        }
+    }
+  };
+
+  const handleDeleteNote = (noteId: string, folderId: string) => {
+    deleteNote(folderId, noteId);
+  };
+
+  const handleUpdateNote = useCallback((updatedNote: Note) => {
+    updateNote(updatedNote.folder_id, updatedNote);
+  }, [updateNote]);
+  
+  const handleTogglePin = (noteId: string, folderId: string) => {
+    togglePinNote(folderId, noteId);
+  }
+
+  const handleBackFromEditor = useCallback(() => {
+    setActiveNote(null);
+    window.location.hash = '';
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark text-center">
+          <div className="animate-pulse-slow">
+              <Logo />
+          </div>
+          <p className="text-lg font-medium font-sans text-charcoal/80 dark:text-text-dark/80 mt-4 px-4 transition-opacity duration-500">
+              {LOADING_MESSAGES[loadingMessageIndex]}
+          </p>
+      </div>
+    );
+  }
+
+  if (noteTakerError) {
+     return (
+      <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
+        <div className="max-w-md p-8 bg-white dark:bg-charcoal-dark rounded-xl shadow-soft border border-coral text-center">
+            <h1 className="text-xl font-bold font-sans text-coral mb-3">Error Loading Notes</h1>
+            <p className="text-charcoal/80 dark:text-text-dark/80">{noteTakerError}</p>
+            <p className="text-sm text-charcoal/60 dark:text-text-dark/60 mt-4">Please try to refresh the page. If the problem persists, the service may be temporarily unavailable.</p>
+
+            <button onClick={() => window.location.reload()} className="mt-6 px-5 py-2 bg-accent text-white font-semibold rounded-lg hover:bg-accent/90 transition-colors">
+                Refresh Page
+            </button>
+        </div>
+      </div>
+    );
+  }
+
+  const activeFolderName = activeFolderId === 'all' ? 'All Notes' : folders.find(f => f.id === activeFolderId)?.name || 'Notes';
+
+  const currentFolder = folders.find(f => f.id === activeNote?.folderId);
+  const noteEditorFolderName = currentFolder ? currentFolder.name : (folders.length > 0 ? folders[0].name : 'Notes');
+  
+  return (
+    <div className="h-screen w-screen font-body text-charcoal dark:text-text-dark bg-paper dark:bg-paper-dark flex overflow-hidden">
+      {activeNote ? (
+        <NoteEditor 
+            key={activeNote.id}
+            note={activeNote}
+            folderName={noteEditorFolderName}
+            onBack={handleBackFromEditor}
+            onUpdateNote={handleUpdateNote}
+        />
+      ) : (
+        <>
+            <Sidebar 
+                folders={folders}
+                activeFolderId={activeFolderId}
+                onSelectFolder={(folderId) => {
+                    setActiveFolderId(folderId);
+                    setIsSidebarOpen(false);
+                }}
+                onAddFolder={addFolder}
+                onDeleteFolder={deleteFolder}
+                onUpdateFolder={updateFolder}
+                onReorderFolders={reorderFolders}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                userEmail={session.user.email}
+                theme={theme}
+                onToggleTheme={toggleTheme}
+                showNoteColorLabels={showNoteColorLabels}
+                onToggleNoteColorLabels={toggleShowNoteColorLabels}
+                onMoveNote={moveNote}
+            />
+            <main className="flex-1 h-screen overflow-y-auto">
+                <NoteStream
+                    title={activeFolderName}
+                    notes={filteredNotes}
+                    onSelectNote={handleSelectNote}
+                    onAddNote={handleAddNote}
+                    onDeleteNote={handleDeleteNote}
+                    onTogglePin={handleTogglePin}
+                    onMenuClick={() => setIsSidebarOpen(true)}
+                    viewMode={viewMode}
+                    onToggleViewMode={toggleViewMode}
+                    showNoteColorLabels={showNoteColorLabels}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                />
+            </main>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default App;

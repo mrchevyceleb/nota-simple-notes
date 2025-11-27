@@ -1,0 +1,8 @@
+{
+  "name": "Nota - Simple Notes",
+  "description": "A dead-simple, cross-platform note-taking app inspired by Notability and Google Keep. It supports text, handwriting, images, and audio recordings with a clean, paper-like aesthetic.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
