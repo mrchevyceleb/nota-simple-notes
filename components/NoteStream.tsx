@@ -8,7 +8,7 @@ import { useOnClickOutside } from '../hooks/useOnClickOutside';
 const getPlainText = (html: string | undefined) => {
     if (!html) return '';
     const text = html.replace(/<[^>]+>/g, '');
-    return text.length > 500 ? text.substring(0, 500) : text;
+    return text.length > 150 ? text.substring(0, 150) : text;
 }
 
 const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = ({ note, accentColor, showNoteColorLabels }) => {
@@ -17,12 +17,12 @@ const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColor
 
   return (
     <div
-      className={`bg-white dark:bg-charcoal-dark rounded-xl shadow-card hover:shadow-card-hover dark:shadow-card-dark dark:hover:shadow-card-hover-dark transition-all duration-300 overflow-hidden h-52 flex flex-col border border-chrome/30 dark:border-border-dark/30 ${showNoteColorLabels ? 'border-t-[3px]' : ''}`}
+      className={`bg-white dark:bg-charcoal-dark rounded-xl shadow-card hover:shadow-card-hover dark:shadow-card-dark dark:hover:shadow-card-hover-dark transition-all duration-300 overflow-hidden h-44 flex flex-col border border-chrome/30 dark:border-border-dark/30 ${showNoteColorLabels ? 'border-t-[3px]' : ''}`}
       style={showNoteColorLabels ? { borderTopColor: accentColor } : {}}
     >
       <div className="p-4 flex-grow flex flex-col">
         <h3 className="font-semibold font-sans text-[15px] leading-snug text-charcoal dark:text-text-dark mb-2 line-clamp-2">{note.title}</h3>
-        <p className="text-[13px] text-charcoal/55 dark:text-text-dark/55 line-clamp-4 leading-relaxed flex-grow">
+        <p className="text-[13px] text-charcoal/55 dark:text-text-dark/55 line-clamp-2 leading-relaxed flex-grow">
             {textPreview || <span className="italic text-charcoal/40 dark:text-text-dark/40">No content</span>}
         </p>
         <p className="text-[11px] text-charcoal/40 dark:text-text-dark/40 mt-3 font-medium tracking-wide">
@@ -158,7 +158,7 @@ const NoteStream: React.FC<NoteStreamProps> = ({ title, notes, onSelectNote, onA
     };
 
     const renderNotes = (notesToRender: NoteWithFolder[]) => {
-        const gridClasses = "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5";
+        const gridClasses = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6";
         const listClasses = "flex flex-col gap-3";
 
         return (

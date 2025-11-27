@@ -52,7 +52,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
   const [textColorPopoverStyle, setTextColorPopoverStyle] = useState<React.CSSProperties>({});
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const [isInteracting, setIsInteracting] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -223,9 +222,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
     if (!mainRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
 
-    const newPage = Math.floor(scrollTop / SEGMENT_HEIGHT) + 1;
-    setCurrentPage(prev => newPage === prev ? prev : newPage);
-
     if (!isSelectingRef.current && paperHeight < MAX_PAPER_HEIGHT && scrollTop + clientHeight >= scrollHeight - 50) {
       setPaperHeight(prev => Math.min(prev + window.innerHeight, MAX_PAPER_HEIGHT));
     }
@@ -374,21 +370,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
       }
   }, [isTextColorPopoverOpen, isMobileView]);
 
-  const handleToolSelect = (tool: Tool) => {
-    const isSwitchingToDrawingTool = [Tool.Pen, Tool.Highlighter, Tool.Eraser].includes(tool);
-    
-    if (isSwitchingToDrawingTool) {
-        if(activeTool === tool) {
-            setIsDrawingPopoverOpen(p => !p);
-        } else {
-            setActiveTool(tool);
-            setIsDrawingPopoverOpen(true);
-        }
-    } else {
-        setActiveTool(tool);
-        setIsDrawingPopoverOpen(false);
-    }
-  };
   
   const handleTextCommand = useCallback((command: 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList') => {
     document.execCommand(command, false);
@@ -590,17 +571,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
   const numSegments = Math.ceil(paperHeight / SEGMENT_HEIGHT);
   const canvasSegments = useMemo(() => Array.from({ length: numSegments }, (_, i) => i), [numSegments]);
   
-  const handleAddNewPage = () => {
-      if (paperHeight >= MAX_PAPER_HEIGHT) return;
-      
-      const targetScrollTop = paperHeight;
-      
-      setPaperHeight(prev => Math.min(prev + SEGMENT_HEIGHT, MAX_PAPER_HEIGHT));
-
-      requestAnimationFrame(() => {
-          mainRef.current?.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-      });
-  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -829,9 +799,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
         </div>
         <div className="border-t border-chrome dark:border-border-dark">
             <div className="flex items-center gap-4 p-2 overflow-x-auto no-scrollbar">
-                <button onClick={() => handleToolSelect(Tool.Text)} className={`p-2 rounded-full transition-colors shrink-0 ${activeTool === Tool.Text ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}>{ICONS.text}</button>
-                <button onClick={() => handleToolSelect(Tool.Hand)} className={`p-2 rounded-full transition-colors shrink-0 ${activeTool === Tool.Hand ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}>{ICONS.hand}</button>
-                <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
                 <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('bold'); }} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.bold}</button>
                 <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('italic'); }} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.italic}</button>
                 <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('strikeThrough'); }} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.strikethrough}</button>
@@ -840,18 +807,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
                 <button onMouseDown={(e) => { e.preventDefault(); handleFormatChecklist(); }} className={`p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.checklist}</button>
 
                 <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
-                
-                 <button onClick={handleAddNewPage} className="p-2 rounded-full flex items-center gap-1.5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0" aria-label="Add new page">
-                    {ICONS.addPage}
-                    <span className="text-sm font-medium hidden sm:inline">New Page</span>
-                </button>
 
-                <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
-
-                <div className="flex shrink-0" ref={drawingToolsRef}>
-                    <button onClick={() => handleToolSelect(Tool.Pen)} className={`p-2 rounded-full transition-colors ${activeTool === Tool.Pen ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}>{ICONS.pen}</button>
-                    <button onClick={() => handleToolSelect(Tool.Highlighter)} className={`p-2 rounded-full transition-colors ${activeTool === Tool.Highlighter ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}>{ICONS.highlighter}</button>
-                    <button onClick={() => handleToolSelect(Tool.Eraser)} className={`p-2 rounded-full transition-colors ${activeTool === Tool.Eraser ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}>{ICONS.eraser}</button>
+                <div className="relative shrink-0" ref={drawingToolsRef}>
+                    <button 
+                        onClick={() => setIsDrawingPopoverOpen(p => !p)} 
+                        className={`p-2 rounded-full transition-colors flex items-center gap-1 ${isDrawingToolActive ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10'}`}
+                        aria-label="Drawing tools"
+                    >
+                        {ICONS.pen}
+                        <svg className="h-3 w-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
                 </div>
                 
                 <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
@@ -866,7 +831,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
         </div>
       </header>
        
-      {isDrawingPopoverOpen && isDrawingToolActive && (
+      {isDrawingPopoverOpen && (
         <div
             style={isMobileView ? {} : popoverStyle}
             className={
@@ -879,32 +844,60 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
                 ref={drawingPopoverRef}
                 className="w-full bg-white dark:bg-charcoal-dark rounded-lg shadow-xl border border-chrome/50 dark:border-border-dark p-3 animate-slide-in-down"
             >
-                <div className="text-sm font-semibold text-charcoal/80 dark:text-text-dark/80 mb-2 px-1 capitalize">
-                    {activeTool}
+                <div className="text-sm font-semibold text-charcoal/80 dark:text-text-dark/80 mb-2 px-1">Tool</div>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                    <button 
+                        onClick={() => setActiveTool(Tool.Pen)} 
+                        className={`h-10 rounded-lg flex items-center justify-center gap-2 transition-colors ${activeTool === Tool.Pen ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        {ICONS.pen}
+                        <span className="text-xs font-medium">Pen</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTool(Tool.Highlighter)} 
+                        className={`h-10 rounded-lg flex items-center justify-center gap-2 transition-colors ${activeTool === Tool.Highlighter ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        {ICONS.highlighter}
+                        <span className="text-xs font-medium">Highlight</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTool(Tool.Eraser)} 
+                        className={`h-10 rounded-lg flex items-center justify-center gap-2 transition-colors ${activeTool === Tool.Eraser ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    >
+                        {ICONS.eraser}
+                        <span className="text-xs font-medium">Eraser</span>
+                    </button>
                 </div>
-                {activeTool !== Tool.Eraser && (
-                    <div className="flex items-center justify-center flex-wrap gap-2 mb-2">
-                        {(activeTool === Tool.Pen ? PEN_COLORS : HIGHLIGHTER_COLORS).map(c => (
-                            <button key={c} onClick={() => activeTool === Tool.Pen ? setPenColor(c) : setHighlighterColor(c)} className={`h-8 w-8 rounded-full border-2 transition-all ${currentDrawingColor === c ? 'border-accent scale-110' : 'border-transparent hover:border-chrome'}`} style={{backgroundColor: c}}></button>
-                        ))}
-                    </div>
+                {activeTool !== Tool.Eraser && activeTool !== Tool.Text && (
+                    <>
+                        <div className="text-sm font-semibold text-charcoal/80 dark:text-text-dark/80 mb-2 px-1">Color</div>
+                        <div className="flex items-center justify-center flex-wrap gap-2 mb-3">
+                            {(activeTool === Tool.Pen ? PEN_COLORS : HIGHLIGHTER_COLORS).map(c => (
+                                <button key={c} onClick={() => activeTool === Tool.Pen ? setPenColor(c) : setHighlighterColor(c)} className={`h-8 w-8 rounded-full border-2 transition-all ${currentDrawingColor === c ? 'border-accent scale-110' : 'border-transparent hover:border-chrome'}`} style={{backgroundColor: c}}></button>
+                            ))}
+                        </div>
+                    </>
                 )}
-                <div className="text-sm font-semibold text-charcoal/80 dark:text-text-dark/80 mb-2 px-1 mt-3">Stroke Width</div>
-                <div className="grid grid-cols-3 gap-2">
-                    {STROKE_WIDTHS.map(w => (
-                        <button key={w} onClick={() => setStrokeWidth(w)} className={`h-10 rounded-lg flex items-center justify-center transition-colors ${strokeWidth === w ? 'bg-accent/10 dark:bg-accent/20' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                            <span className="h-1 rounded-full bg-charcoal dark:bg-text-dark" style={{ width: `${w}px` }}></span>
+                {activeTool !== Tool.Text && (
+                    <>
+                        <div className="text-sm font-semibold text-charcoal/80 dark:text-text-dark/80 mb-2 px-1">Stroke Width</div>
+                        <div className="grid grid-cols-3 gap-2">
+                            {STROKE_WIDTHS.map(w => (
+                                <button key={w} onClick={() => setStrokeWidth(w)} className={`h-10 rounded-lg flex items-center justify-center transition-colors ${strokeWidth === w ? 'bg-accent/10 dark:bg-accent/20' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                    <span className="h-1 rounded-full bg-charcoal dark:bg-text-dark" style={{ width: `${w}px` }}></span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="h-px bg-chrome dark:bg-border-dark my-3"></div>
+                        <button
+                            onClick={handleClearDrawing}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-coral bg-coral/10 hover:bg-coral/20 transition-colors"
+                        >
+                            {React.cloneElement(ICONS.clearCanvas, { className: "h-5 w-5"})}
+                            <span>Clear All Drawings</span>
                         </button>
-                    ))}
-                </div>
-                <div className="h-px bg-chrome dark:bg-border-dark my-3"></div>
-                <button
-                    onClick={handleClearDrawing}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-coral bg-coral/10 hover:bg-coral/20 transition-colors"
-                >
-                    {React.cloneElement(ICONS.clearCanvas, { className: "h-5 w-5"})}
-                    <span>Clear All Drawings</span>
-                </button>
+                    </>
+                )}
             </div>
         </div>
       )}
@@ -1021,9 +1014,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
                 })}
               </div>
             </div>
-        </div>
-        <div className="fixed bottom-4 right-4 z-30 bg-paper/80 dark:bg-charcoal-dark/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-medium shadow-md border border-chrome/50 dark:border-border-dark/50">
-            Page {currentPage} of {numSegments}
         </div>
       </main>
     </div>
