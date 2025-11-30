@@ -740,23 +740,21 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
   return (
     <div className="flex flex-col h-screen w-screen bg-paper dark:bg-paper-dark animate-fade-in">
       <header className="shrink-0 z-20 bg-paper/80 dark:bg-paper-dark/80 backdrop-blur-sm sticky top-0 border-b border-chrome dark:border-border-dark">
-        <div className="flex items-center justify-between p-3">
-            <div className="flex items-center gap-2">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors" aria-label="Go back">
-                    {ICONS.back}
-                </button>
-                <div className='truncate'>
-                    <input 
-                        type="text" 
-                        value={currentNote.title} 
-                        onChange={handleTitleChange}
-                        className="font-sans font-bold text-lg bg-transparent focus:outline-none focus:bg-black/5 dark:focus:bg-white/5 rounded px-2 py-1 w-full"
-                        placeholder="Untitled Note"
-                    />
-                    <p className="text-xs text-charcoal/60 dark:text-text-dark/60 px-2">{folderName}</p>
-                </div>
+        <div className="flex items-center p-3 gap-3">
+            <button onClick={onBack} className="p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0" aria-label="Go back">
+                {ICONS.back}
+            </button>
+            <div className="flex flex-col flex-1">
+                <input 
+                    type="text" 
+                    value={currentNote.title} 
+                    onChange={handleTitleChange}
+                    className="font-sans font-bold text-lg bg-transparent focus:outline-none focus:bg-black/5 dark:focus:bg-white/5 rounded px-2 py-1 w-full"
+                    placeholder="Untitled Note"
+                />
+                <p className="text-xs text-charcoal/60 dark:text-text-dark/60 px-2">{folderName}</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 shrink-0">
                 {saveStatus === 'saved' ? (
                     <div className="flex items-center gap-1.5 text-charcoal/60 dark:text-text-dark/60">
                         {React.cloneElement(ICONS.checkmark, { className: "h-5 w-5"})}
