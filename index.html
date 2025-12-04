@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <!-- App Icon -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%3E%3Crect%20width%3D'512'%20height%3D'512'%20rx%3D'96'%20fill%3D'%234A90E2'%2F%3E%3Cpath%20d%3D'M512%20341.333L341.333%20512H512V341.333Z'%20fill%3D'white'%20fill-opacity%3D'0.3'%2F%3E%3C%2Fsvg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%3E%3Crect%20width%3D'512'%20height%3D'512'%20rx%3D'96'%20fill%3D'%234A90E2'%2F%3E%3Cpath%20d%3D'M512%20341.333L341.333%20512H512V341.333Z'%20fill%3D'white'%20fill-opacity%3D'0.3'%2F%3E%3C%2Fsvg%3E">
+    <link rel="icon" href="/icon-512.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Nota%20-%20Simple%20Notes%22%2C%22short_name%22%3A%22Nota%22%2C%22description%22%3A%22A%20dead-simple%2C%20cross-platform%20note-taking%20app%20inspired%20by%20Notability%20and%20Google%20Keep.%20It%20supports%20text%2C%20handwriting%2C%20images%2C%20and%20audio%20recordings%20with%20a%20clean%2C%20paper-like%20aesthetic.%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23FAFAF7%22%2C%22theme_color%22%3A%22%234A90E2%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D'http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg'%2520viewBox%253D'0%25200%2520512%2520512'%253E%253Crect%2520width%253D'512'%2520height%253D'512'%2520rx%253D'96'%2520fill%253D'%25234A90E2'%252F%253E%253Cpath%2520d%253D'M512%2520341.333L341.333%2520512H512V341.333Z'%2520fill%253D'white'%2520fill-opacity%253D'0.3'%252F%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4A90E2">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -210,18 +210,7 @@
       }
 
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.4/+esm"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+  </head>
   <body class="bg-paper text-charcoal dark:bg-paper-dark dark:text-text-dark">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
