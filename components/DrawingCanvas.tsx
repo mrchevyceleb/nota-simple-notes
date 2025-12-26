@@ -325,7 +325,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   };
 
   return (
-     <div className={`absolute top-0 left-0 ${className}`} style={{ width, height, top: `${yOffset}px` }}>
+     <div className={`absolute top-0 left-0 ${className}`} style={{ width, height: height + 1, top: `${yOffset}px` }}>
       <canvas ref={staticCanvasRef} className="absolute top-0 left-0 pointer-events-none" />
       <canvas
         ref={drawingCanvasRef}
