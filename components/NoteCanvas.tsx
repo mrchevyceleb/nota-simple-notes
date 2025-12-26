@@ -459,7 +459,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   }}
                   dangerouslySetInnerHTML={{ __html: block.content }}
                   data-placeholder="Start typing..."
-                  className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl mx-auto focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
+                  className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
                     ${!block.content && isTextToolActive ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
                     ${isTextToolActive ? "cursor-text" : ""}`}
                 />

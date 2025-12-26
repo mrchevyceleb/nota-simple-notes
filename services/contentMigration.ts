@@ -50,9 +50,9 @@ export function migrateLegacyToCanvas(
       const canvasTextBlock: CanvasTextBlock = {
         id: textBlock.id || `text-${Date.now()}`,
         type: 'canvas-text',
-        x: 0,
+        x: 32,
         y: currentY,
-        width: defaultWidth,
+        width: Math.min(defaultWidth - 64, 900),
         height: defaultHeight,
         zIndex: zIndexText,
         content: textBlock.content || '', // Preserve all HTML, images, formatting
@@ -65,9 +65,9 @@ export function migrateLegacyToCanvas(
       const canvasTextBlock: CanvasTextBlock = {
         id: `text-${Date.now()}`,
         type: 'canvas-text',
-        x: 0,
+        x: 32,
         y: currentY,
-        width: defaultWidth,
+        width: Math.min(defaultWidth - 64, 900),
         height: defaultHeight,
         zIndex: zIndexText,
         content: '',
@@ -109,9 +109,9 @@ export function migrateLegacyToCanvas(
     return [{
       id: `text-${Date.now()}`,
       type: 'canvas-text',
-      x: 0,
+      x: 32,
       y: 0,
-      width: defaultWidth,
+      width: Math.min(defaultWidth - 64, 900),
       height: 800,
       zIndex: 10,
       content: '',
