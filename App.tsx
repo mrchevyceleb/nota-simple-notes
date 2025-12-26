@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Note, Folder, TextBlock } from './types';
+import { Note, Folder, TextBlock, CanvasTextBlock } from './types';
 import { useNoteTaker } from './hooks/useNoteTaker';
 import Sidebar from './components/Sidebar';
 import NoteStream from './components/NoteStream';
 import NoteEditor from './components/NoteEditor';
-import { supabase } from './supabaseClient';
+import { supabase, supabaseInitError } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import Auth from './components/Auth';
 import Logo from './components/Logo';
@@ -12,6 +12,7 @@ import { useTheme } from './hooks/useTheme';
 import { useViewMode } from './hooks/useViewMode';
 import { FOLDER_COLOR_VALUES } from './constants';
 import { useNoteColorLabels } from './hooks/useNoteColorLabels';
+import PWAStatus from './components/PWAStatus';
 
 export interface NoteWithFolder extends Note {
   folderId: string;
@@ -34,6 +35,13 @@ const App: React.FC = () => {
   const [networkError, setNetworkError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (supabaseInitError) {
+      console.error('Supabase initialization failed:', supabaseInitError);
+      setNetworkError('Could not initialize the database client. Please verify your Supabase configuration and try again.');
+      setAuthLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
@@ -55,19 +63,19 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabaseInitError]);
+
+  let content: React.ReactNode = null;
 
   if (authLoading) {
-     return (
+    content = (
       <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
         <div className="text-xl font-semibold font-sans text-charcoal dark:text-text-dark">Connecting...</div>
       </div>
     );
-  }
-  
-  if (networkError && !session) {
-    return (
-       <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
+  } else if (networkError && !session) {
+    content = (
+      <div className="flex items-center justify-center h-screen w-screen bg-paper dark:bg-paper-dark">
         <div className="max-w-md p-8 bg-white dark:bg-charcoal-dark rounded-xl shadow-soft border border-coral text-center">
             <h1 className="text-xl font-bold font-sans text-coral mb-3">Connection Error</h1>
             <p className="text-charcoal/80 dark:text-text-dark/80">{networkError}</p>
@@ -76,14 +84,19 @@ const App: React.FC = () => {
             </button>
         </div>
       </div>
-    )
+    );
+  } else if (!session) {
+    content = <Auth />;
+  } else {
+    content = <NotaApp session={session} />;
   }
 
-  if (!session) {
-    return <Auth />;
-  }
-
-  return <NotaApp session={session} />;
+  return (
+    <>
+      {content}
+      <PWAStatus />
+    </>
+  );
 };
 
 interface NotaAppProps {
@@ -193,9 +206,17 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
     const lowerCaseQuery = searchQuery.toLowerCase();
 
     return notesToFilter.filter(note => {
+      // Support both legacy 'text' and new 'canvas-text' blocks
       const textContent = note.content
-        .filter(block => block.type === 'text')
-        .map(textBlock => getPlainText((textBlock as TextBlock).content))
+        .filter(block => block.type === 'text' || block.type === 'canvas-text')
+        .map(textBlock => {
+          if (textBlock.type === 'text') {
+            return getPlainText((textBlock as TextBlock).content);
+          } else if (textBlock.type === 'canvas-text') {
+            return getPlainText((textBlock as CanvasTextBlock).content);
+          }
+          return '';
+        })
         .join(' ');
       
       const titleMatch = note.title.toLowerCase().includes(lowerCaseQuery);
@@ -287,7 +308,7 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
   
   return (
     <div className="h-screen w-screen font-body text-charcoal dark:text-text-dark bg-paper dark:bg-paper-dark flex overflow-hidden">
-      {activeNote ? (
+      {activeNote && activeNote.id ? (
         <NoteEditor 
             key={activeNote.id}
             note={activeNote}

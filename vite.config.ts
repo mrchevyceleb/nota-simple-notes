@@ -17,9 +17,13 @@ export default defineConfig(({ mode }) => {
         react(),
         VitePWA({
           registerType: 'autoUpdate',
+          injectRegister: null,
           includeAssets: ['icon-192.svg', 'icon-512.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'],
           manifest: false, // We use our own manifest.json in public/
           workbox: {
+            cleanupOutdatedCaches: true,
+            clientsClaim: true,
+            navigateFallback: '/index.html',
             // Cache all static assets
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
             // Network-first strategy for API calls (Supabase)

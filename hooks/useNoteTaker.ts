@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Folder, Note, PaperStyle, TextBlock } from '../types';
+import { Folder, Note, PaperStyle, CanvasTextBlock } from '../types';
 import { supabase } from '../supabaseClient';
 import { Session, User } from '@supabase/supabase-js';
 
@@ -267,16 +267,23 @@ export const useNoteTaker = (session: Session | null) => {
       return null;
     }
 
+    // Create new notes with canvas block format
+    const defaultWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth * 1.5, 1600) : 1600;
     const newNotePartial = {
       folder_id: targetFolderId,
       user_id: user.id,
       title: 'Untitled Note',
       content: [{
         id: `text-${Date.now()}`,
-        type: 'text',
+        type: 'canvas-text',
+        x: 0,
+        y: 0,
+        width: defaultWidth,
+        height: 800, // Increased initial height for visibility
+        zIndex: 10,
         content: '',
         style: { bold: false, italic: false }
-      } as TextBlock],
+      } as CanvasTextBlock],
       paper_style: PaperStyle.Blank,
       paper_color: 'white' as const,
       font_size: 'medium' as const,

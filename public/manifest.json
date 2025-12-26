@@ -2,14 +2,18 @@
   "id": "/",
   "name": "Nota - Simple Notes",
   "short_name": "Nota",
+  "lang": "en",
+  "dir": "ltr",
   "description": "A dead-simple, cross-platform note-taking app inspired by Notability and Google Keep. It supports text, handwriting, images, and audio recordings with a clean, paper-like aesthetic.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#FAFAF7",
   "theme_color": "#4A90E2",
   "orientation": "any",
   "categories": ["productivity", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
@@ -27,7 +31,7 @@
       "src": "/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-192.svg",

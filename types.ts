@@ -39,13 +39,46 @@ export interface AudioBlock {
 
 export type ContentBlock = TextBlock | DrawingBlock | AudioBlock;
 
+// New Canvas Block types for unified infinite canvas experience
+export interface CanvasBlockBase {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+}
+
+export interface CanvasTextBlock extends CanvasBlockBase {
+  type: 'canvas-text';
+  content: string;
+  style: {
+    bold: boolean;
+    italic: boolean;
+  };
+}
+
+export interface CanvasDrawingBlock extends CanvasBlockBase {
+  type: 'canvas-drawing';
+  paths: DrawingPath[];
+}
+
+export interface CanvasImageBlock extends CanvasBlockBase {
+  type: 'canvas-image';
+  src: string; // base64 or URL
+  alt?: string;
+}
+
+export type CanvasBlock = CanvasTextBlock | CanvasDrawingBlock | CanvasImageBlock | AudioBlock;
+
 export type FontSize = 'small' | 'medium' | 'large';
 
 export interface Note {
   id: string; // UUID from Supabase
   folder_id: string; // UUID from Supabase
   title: string;
-  content: ContentBlock[];
+  content: ContentBlock[] | CanvasBlock[]; // Support both legacy and new canvas format
   created_at: string; // ISO 8601 date string
   updated_at: string; // ISO 8601 date string
   paper_style: PaperStyle;
