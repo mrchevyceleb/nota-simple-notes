@@ -77,29 +77,38 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, viewMode, onSelect, onToggleP
         e.dataTransfer.effectAllowed = 'move';
     };
 
+    // Handle click on the card - separate from drag to ensure clicks work reliably
+    const handleClick = (e: React.MouseEvent) => {
+        // Don't trigger if clicking on action buttons
+        if ((e.target as HTMLElement).closest('.note-action-btn')) {
+            return;
+        }
+        onSelect();
+    };
+
     return (
         <div 
             className="relative group cursor-grab active:cursor-grabbing" 
             draggable 
             onDragStart={handleDragStart}
+            onClick={handleClick}
         >
-            <button 
-                onClick={onSelect} 
+            <div 
                 className="w-full h-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent rounded-xl transform transition-transform duration-200 hover:-translate-y-1"
             >
                 {viewMode === 'grid' 
                     ? <NotePreviewGrid note={note} accentColor={accentColor} showNoteColorLabels={showNoteColorLabels} /> 
                     : <NotePreviewList note={note} accentColor={accentColor} showNoteColorLabels={showNoteColorLabels} />}
-            </button>
-            {/* Action buttons - hidden until hover */}
-            <div className={`absolute flex items-center gap-1.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+            </div>
+            {/* Action buttons - hidden until hover, with pointer-events-none when hidden */}
+            <div className={`absolute flex items-center gap-1.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto ${
                 viewMode === 'grid' 
                     ? 'top-3 right-3 flex-row' 
                     : 'top-1/2 -translate-y-1/2 right-3 flex-row'
             }`}>
                 <button
                     onClick={(e) => { e.stopPropagation(); onTogglePin(note.id, note.folderId); }}
-                    className={pinButtonClasses}
+                    className={`${pinButtonClasses} note-action-btn`}
                     aria-label={note.is_pinned ? 'Unpin note' : 'Pin note'}
                 >
                     {note.is_pinned 
