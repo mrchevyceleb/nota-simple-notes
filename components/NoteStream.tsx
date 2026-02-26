@@ -1,19 +1,24 @@
 import React, { useState, useRef } from 'react';
 import { NoteWithFolder } from '../App';
-import { Note, TextBlock } from '../types';
+import { Note, TextBlock, CanvasTextBlock } from '../types';
 import { ICONS, FOLDER_COLOR_VALUES } from '../constants';
 import { ViewMode } from '../hooks/useViewMode';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 
 const getPlainText = (html: string | undefined) => {
     if (!html) return '';
-    const text = html.replace(/<[^>]+>/g, '');
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     return text.length > 150 ? text.substring(0, 150) : text;
 }
 
+const getNoteTextPreview = (note: Note): string => {
+    // Look for both legacy 'text' blocks and canvas 'canvas-text' blocks
+    const textBlock = note.content.find(b => b.type === 'text' || b.type === 'canvas-text') as TextBlock | CanvasTextBlock | undefined;
+    return getPlainText(textBlock?.content);
+}
+
 const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = ({ note, accentColor, showNoteColorLabels }) => {
-  const firstText = note.content.find(b => b.type === 'text') as TextBlock | undefined;
-  const textPreview = getPlainText(firstText?.content);
+  const textPreview = getNoteTextPreview(note);
 
   return (
     <div
@@ -34,8 +39,7 @@ const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColor
 };
 
 const NotePreviewList: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = ({ note, accentColor, showNoteColorLabels }) => {
-    const firstText = note.content.find(b => b.type === 'text') as TextBlock | undefined;
-    const textPreview = getPlainText(firstText?.content);
+    const textPreview = getNoteTextPreview(note);
   
     return (
       <div
