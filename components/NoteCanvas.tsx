@@ -422,7 +422,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               <div
                 key={block.id}
                 data-text-block
-                className={`absolute px-4 md:px-8 py-8 ${isTextToolActive ? 'pointer-events-auto' : 'pointer-events-none'} ${isHandToolActive ? 'pointer-events-auto cursor-grab' : ''}`}
+                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-auto'}`}
                 style={{
                   left: `${block.x}px`,
                   top: `${block.y}px`,
@@ -441,9 +441,9 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                       textBlockRefs.current.delete(block.id);
                     }
                   }}
-                  contentEditable={isTextToolActive}
+                  contentEditable={true}
                   suppressContentEditableWarning
-                  onClick={() => {
+                  onClick={(e) => {
                     if (isTextToolActive) {
                       setFocusedTextBlockId(block.id);
                     }
@@ -460,8 +460,8 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   dangerouslySetInnerHTML={{ __html: block.content }}
                   data-placeholder="Start typing..."
                   className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
-                    ${!block.content && isTextToolActive ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
-                    ${isTextToolActive ? "cursor-text" : ""}`}
+                    ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
+                    cursor-text`}
                 />
               </div>
             ))}
