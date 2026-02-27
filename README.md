@@ -1,20 +1,58 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Nota — Simple Notes
 
-# Run and deploy your AI Studio app
+A dead-simple, cross-platform note-taking app inspired by Notability and Google Keep. Supports text, handwriting, images, and audio recordings with a clean, paper-like aesthetic.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/192E5kV6LunX7z8_N6oCRiT9sP6HmGPry
+- 📝 Unified infinite canvas — type and draw on the same surface
+- 🖊️ Pen, highlighter, and eraser tools with pressure-like rendering
+- 🗂️ Folders with color labels and drag-to-reorder
+- 📌 Pin important notes to the top
+- 🌙 Dark mode
+- 📴 Offline-ready (PWA)
+- ☁️ Synced via Supabase
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js, a [Supabase](https://supabase.com) project
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```
+   npm install
+   ```
+
+2. Create a `.env.local` file in the project root with your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+   VITE_SUPABASE_ANON_KEY=<your-anon-key>
+   ```
+   You can find these values in your Supabase project under **Settings → API**.
+
+3. Run the development server:
+   ```
+   npm run dev
+   ```
+
+## Deploy
+
+1. Build the project:
+   ```
+   npm run build
+   ```
+
+2. Start the production server:
+   ```
+   npm start
+   ```
+   The server serves the built `dist/` folder and handles SPA routing.
+
+   Set the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` environment variables on your hosting platform before deploying.
+
+## Database Setup
+
+The app expects the following Supabase tables:
+
+- **`folders`** – `id`, `user_id`, `name`, `color_index`, `created_at`
+- **`notes`** – `id`, `user_id`, `folder_id`, `title`, `content` (jsonb), `paper_style`, `paper_color`, `font_size`, `is_pinned`, `created_at`, `updated_at`
+
+Row-Level Security (RLS) should be enabled on both tables with policies that restrict access to `auth.uid() = user_id`.

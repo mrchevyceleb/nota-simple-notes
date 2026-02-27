@@ -63,7 +63,7 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabaseInitError]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- supabaseInitError is a module-level constant; empty array is intentional for run-once semantics
 
   let content: React.ReactNode = null;
 
@@ -103,6 +103,15 @@ interface NotaAppProps {
   session: Session;
 }
 
+const LOADING_MESSAGES = [
+  "Loading your notes...",
+  "Waking up the database...",
+  "Organizing your thoughts...",
+  "Fetching your latest edits...",
+  "This can take a moment if the server was sleeping.",
+  "Almost there...",
+];
+
 const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
   const { folders, loading, error: noteTakerError, addFolder, deleteFolder, updateFolder, reorderFolders, addNote, deleteNote, updateNote, togglePinNote, moveNote } = useNoteTaker(session);
   const [theme, toggleTheme] = useTheme();
@@ -116,15 +125,6 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
   const initialUrlChecked = useRef(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
-  const LOADING_MESSAGES = [
-    "Loading your notes...",
-    "Waking up the database...",
-    "Organizing your thoughts...",
-    "Fetching your latest edits...",
-    "This can take a moment if the server was sleeping.",
-    "Almost there...",
-  ];
-
   useEffect(() => {
     let interval: number;
     if (loading) {
@@ -137,7 +137,7 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
         window.clearInterval(interval);
       }
     };
-  }, [loading]);
+  }, [loading, LOADING_MESSAGES.length]);
 
   const allNotes: NoteWithFolder[] = useMemo(() => {
     return folders

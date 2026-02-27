@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Note, Tool, CanvasBlock, AudioBlock, PaperStyle, FontSize, CanvasTextBlock } from '../types';
 import { ICONS, PEN_COLORS, HIGHLIGHTER_COLORS, STROKE_WIDTHS, TEXT_COLORS } from '../constants';
 import NoteCanvas from './NoteCanvas';
@@ -81,7 +81,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
   const [isTextColorPopoverOpen, setIsTextColorPopoverOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const [textColorPopoverStyle, setTextColorPopoverStyle] = useState<React.CSSProperties>({});
-  const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+  const [isMobileView, setIsMobileView] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [isInteracting, setIsInteracting] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -126,21 +126,34 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
     };
   }, [isDrawingPopoverOpen, isPaperPopoverOpen, isTextColorPopoverOpen]);
   
-  const debouncedOnUpdateNote = useCallback(
+  // Keep onUpdateNote in a ref so the debounced function can always call the
+  // latest version without being recreated (which would reset the timer).
+  const onUpdateNoteRef = useRef(onUpdateNote);
+  useLayoutEffect(() => {
+    onUpdateNoteRef.current = onUpdateNote;
+  });
+
+  const debouncedOnUpdateNote = useRef(
     debounce((noteToSave: Note) => {
-      onUpdateNote(noteToSave);
+      onUpdateNoteRef.current(noteToSave);
       setSaveStatus('saved');
-    }, 1000),
-    [onUpdateNote]
-  );
+    }, 1000)
+  ).current;
   
+  // Keep a ref to the latest currentNote so the sync effect can compare without
+  // adding currentNote itself as a dependency (which would cause infinite loops).
+  const currentNoteRef = useRef(currentNote);
+  useLayoutEffect(() => {
+    currentNoteRef.current = currentNote;
+  });
+
   // Sync external note changes (but not during interaction or saving)
   useEffect(() => {
     if (isInteracting || saveStatus === 'saving') {
       return;
     }
     
-    if (!areNotesEqual(note, currentNote)) {
+    if (!areNotesEqual(note, currentNoteRef.current)) {
       // Re-migrate if external note is still in legacy format
       const newContent = isLegacyContent(note.content) 
         ? migrateLegacyToCanvas(note.content, getDefaultCanvasWidth())
