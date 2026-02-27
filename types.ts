@@ -103,6 +103,14 @@ export enum Tool {
   Hand = 'hand',
 }
 
+export interface Notification {
+  id: string;          // UUID from Supabase
+  user_id: string;     // UUID – references auth.users
+  message: string;
+  read_at: string | null; // ISO 8601 timestamp; null means unread
+  created_at: string;  // ISO 8601 timestamp
+}
+
 export enum PaperStyle {
   Blank = 'blank',
   Wide = 'wide',
