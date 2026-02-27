@@ -409,7 +409,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
             {/* Tool Selection */}
             <button 
               onClick={() => setActiveTool(Tool.Text)}
-              className={`p-2.5 rounded-full transition-colors shrink-0 ${activeTool === Tool.Text ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`}
+              className={`p-3 rounded-full transition-colors shrink-0 ${activeTool === Tool.Text ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`}
               aria-label="Text tool"
             >
               {ICONS.text}
@@ -418,33 +418,33 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, folderName, onBack, onUpd
             <div className="relative shrink-0" ref={drawingToolsRef}>
               <button 
                 onClick={() => setIsDrawingPopoverOpen(p => !p)} 
-                className={`p-2.5 rounded-full transition-colors flex items-center gap-1 ${isDrawingToolActive ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`}
+                className={`p-3 rounded-full transition-colors flex items-center gap-1 ${isDrawingToolActive ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`}
                 aria-label="Drawing tools"
               >
                 {ICONS.pen}
-                <svg className="h-3 w-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                <svg className="h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
             </div>
             
-            <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
+            <div className="h-7 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
             
             {/* Text Formatting (only show when text tool is active) */}
             {activeTool === Tool.Text && (
               <>
-                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('bold'); }} className={`p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.bold}</button>
-                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('italic'); }} className={`p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.italic}</button>
-                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('strikeThrough'); }} className={`p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.strikethrough}</button>
-                <button ref={textColorButtonRef} onMouseDown={(e) => { e.preventDefault(); setIsTextColorPopoverOpen(p => !p); }} className={`p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 ${isTextColorPopoverOpen ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'text-charcoal dark:text-text-dark'}`}>{ICONS.textColor}</button>
-                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('insertUnorderedList'); }} className={`p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.bulletList}</button>
+                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('bold'); }} className={`p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.bold}</button>
+                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('italic'); }} className={`p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.italic}</button>
+                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('strikeThrough'); }} className={`p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.strikethrough}</button>
+                <button ref={textColorButtonRef} onMouseDown={(e) => { e.preventDefault(); setIsTextColorPopoverOpen(p => !p); }} className={`p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 ${isTextColorPopoverOpen ? 'bg-accent/10 text-accent dark:bg-accent/20' : 'text-charcoal dark:text-text-dark'}`}>{ICONS.textColor}</button>
+                <button onMouseDown={(e) => { e.preventDefault(); handleTextCommand('insertUnorderedList'); }} className={`p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark`}>{ICONS.bulletList}</button>
                 
-                <div className="h-6 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
+                <div className="h-7 w-px bg-chrome dark:bg-border-dark shrink-0"></div>
               </>
             )}
             
-            <button onClick={() => imageInputRef.current?.click()} className="p-2.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark" aria-label="Add image">{ICONS.image}</button>
+            <button onClick={() => imageInputRef.current?.click()} className="p-3 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 text-charcoal dark:text-text-dark" aria-label="Add image">{ICONS.image}</button>
             <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImageUpload} className="hidden" />
             
-            <button onClick={isRecording ? stopRecording : startRecording} className={`p-2.5 rounded-full transition-colors shrink-0 ${isRecording ? 'text-coral pulse-rec-animation' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`} aria-label={isRecording ? 'Stop recording' : 'Start recording'}>
+            <button onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full transition-colors shrink-0 ${isRecording ? 'text-coral pulse-rec-animation' : 'hover:bg-black/10 dark:hover:bg-white/10 text-charcoal dark:text-text-dark'}`} aria-label={isRecording ? 'Stop recording' : 'Start recording'}>
               {isRecording ? ICONS.stop : ICONS.mic}
             </button>
           </div>
