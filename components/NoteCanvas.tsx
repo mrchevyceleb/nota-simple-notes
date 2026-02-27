@@ -430,8 +430,22 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   minHeight: `${block.height}px`,
                   zIndex: block.zIndex,
                 }}
-                onMouseDown={(e) => handleBlockDragStart(e, block)}
-                onTouchStart={(e) => handleBlockDragStart(e, block)}
+                onMouseDown={(e) => {
+                  if (isTextToolActive) {
+                    // Stop propagation so react-zoom-pan-pinch doesn't intercept
+                    // the mousedown and prevent focus on the contentEditable element
+                    e.stopPropagation();
+                    return;
+                  }
+                  handleBlockDragStart(e, block);
+                }}
+                onTouchStart={(e) => {
+                  if (isTextToolActive) {
+                    e.stopPropagation();
+                    return;
+                  }
+                  handleBlockDragStart(e, block);
+                }}
               >
                 <div
                   ref={(el) => {
@@ -441,11 +455,24 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                       textBlockRefs.current.delete(block.id);
                     }
                   }}
-                  contentEditable={true}
+                  contentEditable={isTextToolActive}
                   suppressContentEditableWarning
+                  onMouseDown={(e) => {
+                    if (isTextToolActive) {
+                      // Prevent react-zoom-pan-pinch from stealing focus
+                      e.stopPropagation();
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (isTextToolActive) {
+                      e.stopPropagation();
+                    }
+                  }}
                   onClick={(e) => {
                     if (isTextToolActive) {
+                      e.stopPropagation();
                       setFocusedTextBlockId(block.id);
+                      (e.currentTarget as HTMLElement).focus();
                     }
                   }}
                   onFocus={() => setFocusedTextBlockId(block.id)}
@@ -461,7 +488,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   data-placeholder="Start typing..."
                   className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
                     ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
-                    cursor-text`}
+                    ${isTextToolActive ? 'cursor-text' : 'cursor-default'}`}
                 />
               </div>
             ))}
