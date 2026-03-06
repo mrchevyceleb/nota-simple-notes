@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SB_URL;
+const supabaseAnonKey = import.meta.env.VITE_SB_ANON_KEY;
 
 const isMissingConfig = !supabaseUrl || !supabaseAnonKey;
 
@@ -10,7 +10,7 @@ let supabaseClient: ReturnType<typeof createClient> | null = null;
 
 if (isMissingConfig) {
   supabaseInitError = new Error(
-    'Supabase credentials are not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.'
+    'Supabase credentials are not configured. Set VITE_SB_URL and VITE_SB_ANON_KEY environment variables.'
   );
   console.error(supabaseInitError.message);
 } else {
