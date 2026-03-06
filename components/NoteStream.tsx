@@ -26,7 +26,7 @@ const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColor
       style={showNoteColorLabels ? { borderTopColor: accentColor } : {}}
     >
       <div className="p-4 flex-grow flex flex-col">
-        <h3 className="font-semibold font-sans text-[15px] leading-snug text-charcoal dark:text-text-dark mb-2 line-clamp-2">{note.title}</h3>
+        <h3 className="font-semibold font-sans text-[15px] leading-snug text-charcoal dark:text-text-dark mb-2 line-clamp-2 pr-8">{note.title}</h3>
         <p className="text-[13px] text-charcoal/55 dark:text-text-dark/55 line-clamp-2 leading-relaxed flex-grow">
             {textPreview || <span className="italic text-charcoal/40 dark:text-text-dark/40">No content</span>}
         </p>
