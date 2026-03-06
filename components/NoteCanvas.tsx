@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
 import { getPaperPatternStyles, LINE_COLOR_ON_LIGHT, LINE_COLOR_ON_DARK } from '../constants';
 import DrawingCanvas from './DrawingCanvas';
@@ -64,8 +63,6 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   const paperRef = useRef<HTMLDivElement>(null);
   const textBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousBlocksRef = useRef<CanvasBlock[]>([]);
-  const transformRef = useRef<ReactZoomPanPinchRef>(null);
-
   // Tool state checks - define these early so they can be used in effects
   const isDrawingToolActive = useMemo(
     () => [Tool.Pen, Tool.Highlighter, Tool.Eraser].includes(activeTool),
@@ -283,24 +280,16 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {
-    transformRef.current?.zoomIn(0.3);
+    setScale(prev => Math.min(3, prev + 0.1));
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    transformRef.current?.zoomOut(0.3);
+    setScale(prev => Math.max(0.1, prev - 0.1));
   }, []);
 
   const handleResetZoom = useCallback(() => {
-    transformRef.current?.resetTransform();
+    setScale(1);
   }, []);
-
-  // Handle transform changes to track scale
-  const handleTransformChange = useCallback((ref: ReactZoomPanPinchRef) => {
-    setScale(ref.state.scale);
-  }, []);
-
-  // Panning is enabled with Hand tool or when not using drawing/text tools
-  const isPanningEnabled = isHandToolActive || (!isDrawingToolActive && !isTextToolActive);
 
   // Handle canvas click for text tool (create new text block)
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -370,26 +359,15 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
         </button>
       </div>
 
-      <TransformWrapper
-        ref={transformRef}
-        initialScale={1}
-        minScale={0.1}
-        maxScale={3}
-        limitToBounds={false}
-        panning={{ disabled: !isPanningEnabled }}
-        onTransformed={handleTransformChange}
-        wheel={{ step: 0.1 }}
-      >
-        <TransformComponent
-          wrapperStyle={{ width: '100%', height: '100%', overflow: 'visible' }}
-          contentStyle={{ width: canvasBounds.width, height: canvasBounds.height }}
-        >
+      <div className="flex-1 overflow-auto">
           <div
             ref={paperRef}
             style={{
               ...paperStyleProps,
               width: `${canvasBounds.width}px`,
               height: `${canvasBounds.height}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
             }}
             className={`relative transition-all duration-200 ${isHandToolActive ? 'cursor-grab' : ''} ${dragState.blockId ? 'cursor-grabbing' : ''}`}
             onClick={handleCanvasClick}
@@ -431,20 +409,10 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   zIndex: block.zIndex,
                 }}
                 onMouseDown={(e) => {
-                  if (isTextToolActive) {
-                    // Stop propagation so react-zoom-pan-pinch doesn't intercept
-                    // the mousedown and prevent focus on the contentEditable element
-                    e.stopPropagation();
-                    return;
-                  }
-                  handleBlockDragStart(e, block);
+                  if (!isTextToolActive) handleBlockDragStart(e, block);
                 }}
                 onTouchStart={(e) => {
-                  if (isTextToolActive) {
-                    e.stopPropagation();
-                    return;
-                  }
-                  handleBlockDragStart(e, block);
+                  if (!isTextToolActive) handleBlockDragStart(e, block);
                 }}
               >
                 <div
@@ -457,17 +425,6 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   }}
                   contentEditable={isTextToolActive}
                   suppressContentEditableWarning
-                  onMouseDown={(e) => {
-                    if (isTextToolActive) {
-                      // Prevent react-zoom-pan-pinch from stealing focus
-                      e.stopPropagation();
-                    }
-                  }}
-                  onTouchStart={(e) => {
-                    if (isTextToolActive) {
-                      e.stopPropagation();
-                    }
-                  }}
                   onClick={(e) => {
                     if (isTextToolActive) {
                       e.stopPropagation();
@@ -534,8 +491,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               </div>
             )}
           </div>
-        </TransformComponent>
-      </TransformWrapper>
+      </div>
     </div>
   );
 };
