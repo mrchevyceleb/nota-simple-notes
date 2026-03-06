@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, Note, PaperStyle, CanvasTextBlock } from '../types';
 import { supabase } from '../supabaseClient';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 const FOLDER_ORDER_KEY = 'nota-folder-order';
 
@@ -105,24 +105,26 @@ export const useNoteTaker = (session: Session | null) => {
   useEffect(() => {
     if (!userId) return;
 
-    const handleDbChange = (payload: any) => {
-      const { eventType, table, new: newRecord, old: oldRecord } = payload;
+    const handleDbChange = (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      const { eventType, table } = payload;
+      const newRecord = 'new' in payload ? payload.new as unknown as Record<string, unknown> : undefined;
+      const oldRecord = 'old' in payload ? payload.old as unknown as Record<string, unknown> : undefined;
 
       setFolders(currentFolders => {
         // --- FOLDER CHANGES ---
         if (table === 'folders') {
-          if (eventType === 'INSERT') {
-            const newFolder = { ...(newRecord as Folder), notes: [] };
+          if (eventType === 'INSERT' && newRecord) {
+            const newFolder = { ...(newRecord as unknown as Folder), notes: [] };
             if (currentFolders.some(f => f.id === newFolder.id)) return currentFolders;
             const updatedFolders = [newFolder, ...currentFolders];
             localStorage.setItem(FOLDER_ORDER_KEY, JSON.stringify(updatedFolders.map(f => f.id)));
             return updatedFolders;
           }
-          if (eventType === 'UPDATE') {
-            return currentFolders.map(f => f.id === newRecord.id ? { ...f, ...newRecord } : f);
+          if (eventType === 'UPDATE' && newRecord) {
+            return currentFolders.map(f => f.id === (newRecord as unknown as Folder).id ? { ...f, ...newRecord } : f);
           }
-          if (eventType === 'DELETE') {
-             const updatedFolders = currentFolders.filter(f => f.id !== oldRecord.id);
+          if (eventType === 'DELETE' && oldRecord) {
+             const updatedFolders = currentFolders.filter(f => f.id !== (oldRecord as unknown as Folder).id);
              localStorage.setItem(FOLDER_ORDER_KEY, JSON.stringify(updatedFolders.map(f => f.id)));
              return updatedFolders;
           }
@@ -130,8 +132,8 @@ export const useNoteTaker = (session: Session | null) => {
 
         // --- NOTE CHANGES ---
         if (table === 'notes') {
-          if (eventType === 'INSERT') {
-            const newNote = newRecord as Note;
+          if (eventType === 'INSERT' && newRecord) {
+            const newNote = newRecord as unknown as Note;
             return currentFolders.map(folder => {
               if (folder.id === newNote.folder_id) {
                 if (folder.notes.some(n => n.id === newNote.id)) return folder;
@@ -142,15 +144,15 @@ export const useNoteTaker = (session: Session | null) => {
             });
           }
 
-          if (eventType === 'UPDATE') {
-            const updatedNote = newRecord as Note;
+          if (eventType === 'UPDATE' && newRecord) {
+            const updatedNote = newRecord as unknown as Note;
             let foldersWithNoteRemoved = currentFolders.map(f => {
               if (f.notes.some(n => n.id === updatedNote.id)) {
                 return { ...f, notes: f.notes.filter(n => n.id !== updatedNote.id) };
               }
               return f;
             });
-            
+
             return foldersWithNoteRemoved.map(f => {
               if (f.id === updatedNote.folder_id) {
                 const updatedNotes = [updatedNote, ...f.notes].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -159,11 +161,11 @@ export const useNoteTaker = (session: Session | null) => {
               return f;
             });
           }
-          
-          if (eventType === 'DELETE') {
+
+          if (eventType === 'DELETE' && oldRecord) {
             return currentFolders.map(folder => ({
                 ...folder,
-                notes: folder.notes.filter(n => n.id !== oldRecord.id)
+                notes: folder.notes.filter(n => n.id !== (oldRecord as unknown as Note).id)
             }));
           }
         }
@@ -194,7 +196,7 @@ export const useNoteTaker = (session: Session | null) => {
 
     if (error) {
         console.error("Error adding folder:", error.message);
-        alert(`Failed to create folder: ${error.message}`);
+        console.error(`Failed to create folder: ${error.message}`);
         return;
     }
     
@@ -224,7 +226,7 @@ export const useNoteTaker = (session: Session | null) => {
 
     if (notesError) {
         console.error('Error deleting notes in folder:', notesError.message);
-        alert(`Failed to delete folder: could not remove associated notes. ${notesError.message}`);
+        console.error(`Failed to delete folder: could not remove associated notes. ${notesError.message}`);
         setFolders(originalFolders);
         localStorage.setItem(FOLDER_ORDER_KEY, JSON.stringify(originalFolders.map(f => f.id)));
         return;
@@ -233,7 +235,7 @@ export const useNoteTaker = (session: Session | null) => {
     const { error: folderError } = await supabase.from('folders').delete().eq('id', folderId);
     if (folderError) {
         console.error('Error deleting folder:', folderError.message);
-        alert(`Failed to delete folder: ${folderError.message}`);
+        console.error(`Failed to delete folder: ${folderError.message}`);
         setFolders(originalFolders);
         localStorage.setItem(FOLDER_ORDER_KEY, JSON.stringify(originalFolders.map(f => f.id)));
     }
@@ -263,7 +265,7 @@ export const useNoteTaker = (session: Session | null) => {
 
     if (!targetFolderId) {
       console.error("No folder available to add a note to.");
-      alert("Could not find a folder to add the note to. Please create a folder first.");
+      console.error("Could not find a folder to add the note to. Please create a folder first.");
       return null;
     }
 
@@ -293,7 +295,7 @@ export const useNoteTaker = (session: Session | null) => {
     const { data, error } = await supabase.from('notes').insert(newNotePartial).select().single();
     if(error) {
         console.error("Error adding note:", error.message);
-        alert(`Failed to create note: ${error.message}`);
+        console.error(`Failed to create note: ${error.message}`);
         return null;
     }
 
@@ -330,7 +332,7 @@ export const useNoteTaker = (session: Session | null) => {
     
     if (error) {
       console.error('Error deleting note:', error.message);
-      alert(`Failed to delete note: ${error.message}.`);
+      console.error(`Failed to delete note: ${error.message}.`);
       setFolders(originalFolders);
     }
   }, [folders]);
@@ -451,7 +453,25 @@ export const useNoteTaker = (session: Session | null) => {
       const { error } = await supabase.from('notes').update({ folder_id: destinationFolderId }).eq('id', noteId);
       if(error) {
           console.error("Error moving note:", error.message);
-          // We should probably revert here in a real app, but relying on re-fetch/subscription correction for now
+          // Revert the optimistic update
+          setFolders(currentFolders => {
+              let noteToRevert: Note | undefined;
+              const foldersWithoutNote = currentFolders.map(f => {
+                  const note = f.notes.find(n => n.id === noteId);
+                  if (note) {
+                      noteToRevert = { ...note, folder_id: sourceFolderId || f.id };
+                      return { ...f, notes: f.notes.filter(n => n.id !== noteId) };
+                  }
+                  return f;
+              });
+              if (!noteToRevert) return currentFolders;
+              return foldersWithoutNote.map(f => {
+                  if (f.id === (sourceFolderId || noteToRevert!.folder_id)) {
+                      return { ...f, notes: [noteToRevert!, ...f.notes].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) };
+                  }
+                  return f;
+              });
+          });
       }
   }, []);
 

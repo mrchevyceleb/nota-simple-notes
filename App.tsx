@@ -14,6 +14,35 @@ import { FOLDER_COLOR_VALUES } from './constants';
 import { useNoteColorLabels } from './hooks/useNoteColorLabels';
 import PWAStatus from './components/PWAStatus';
 
+interface Toast {
+  id: number;
+  message: string;
+  type: 'error' | 'success' | 'info';
+}
+
+let toastId = 0;
+
+const ToastContainer: React.FC<{ toasts: Toast[]; onDismiss: (id: number) => void }> = ({ toasts, onDismiss }) => {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+      {toasts.map(toast => (
+        <div
+          key={toast.id}
+          className={`px-4 py-3 rounded-xl shadow-lg text-sm font-medium animate-slide-in-right flex items-center gap-3 ${
+            toast.type === 'error' ? 'bg-coral text-white' :
+            toast.type === 'success' ? 'bg-green-500 text-white' :
+            'bg-charcoal text-white dark:bg-charcoal-dark dark:text-text-dark'
+          }`}
+        >
+          <span className="flex-1">{toast.message}</span>
+          <button onClick={() => onDismiss(toast.id)} className="opacity-70 hover:opacity-100 transition-opacity text-lg leading-none">&times;</button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export interface NoteWithFolder extends Note {
   folderId: string;
   folderColorIndex?: number;
@@ -33,6 +62,17 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback((message: string, type: Toast['type'] = 'error') => {
+    const id = ++toastId;
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  }, []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   useEffect(() => {
     if (supabaseInitError) {
@@ -63,7 +103,7 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabaseInitError]);
+  }, []);
 
   let content: React.ReactNode = null;
 
@@ -95,6 +135,7 @@ const App: React.FC = () => {
     <>
       {content}
       <PWAStatus />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 };
@@ -113,6 +154,13 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
   const [activeNote, setActiveNote] = useState<NoteWithFolder | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const initialUrlChecked = useRef(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
@@ -151,6 +199,25 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   }, [folders]);
 
+  const searchTextMap = useMemo(() => {
+    const map = new Map<string, string>();
+    allNotes.forEach(note => {
+      const textContent = note.content
+        .filter(block => block.type === 'text' || block.type === 'canvas-text')
+        .map(textBlock => {
+          if (textBlock.type === 'text') {
+            return getPlainText((textBlock as TextBlock).content);
+          } else if (textBlock.type === 'canvas-text') {
+            return getPlainText((textBlock as CanvasTextBlock).content);
+          }
+          return '';
+        })
+        .join(' ');
+      map.set(note.id, (note.title + ' ' + textContent).toLowerCase());
+    });
+    return map;
+  }, [allNotes]);
+
   useEffect(() => {
     if (!loading && allNotes.length > 0 && !initialUrlChecked.current) {
         const hash = window.location.hash;
@@ -173,7 +240,18 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
       if (!updatedNoteInList) {
           return null; // Note was deleted
       }
-      if (JSON.stringify(updatedNoteInList) !== JSON.stringify(currentActiveNote)) {
+      if (
+        updatedNoteInList.id !== currentActiveNote.id ||
+        updatedNoteInList.updated_at !== currentActiveNote.updated_at ||
+        updatedNoteInList.title !== currentActiveNote.title ||
+        updatedNoteInList.is_pinned !== currentActiveNote.is_pinned ||
+        updatedNoteInList.paper_style !== currentActiveNote.paper_style ||
+        updatedNoteInList.paper_color !== currentActiveNote.paper_color ||
+        updatedNoteInList.font_size !== currentActiveNote.font_size ||
+        updatedNoteInList.content.length !== currentActiveNote.content.length ||
+        updatedNoteInList.folderId !== currentActiveNote.folderId ||
+        updatedNoteInList.folder_id !== currentActiveNote.folder_id
+      ) {
         return updatedNoteInList;
       }
       return currentActiveNote;
@@ -199,32 +277,17 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
       }) : [];
     }
 
-    if (!searchQuery.trim()) {
+    if (!debouncedSearchQuery.trim()) {
       return notesToFilter;
     }
 
-    const lowerCaseQuery = searchQuery.toLowerCase();
+    const lowerCaseQuery = debouncedSearchQuery.toLowerCase();
 
     return notesToFilter.filter(note => {
-      // Support both legacy 'text' and new 'canvas-text' blocks
-      const textContent = note.content
-        .filter(block => block.type === 'text' || block.type === 'canvas-text')
-        .map(textBlock => {
-          if (textBlock.type === 'text') {
-            return getPlainText((textBlock as TextBlock).content);
-          } else if (textBlock.type === 'canvas-text') {
-            return getPlainText((textBlock as CanvasTextBlock).content);
-          }
-          return '';
-        })
-        .join(' ');
-      
-      const titleMatch = note.title.toLowerCase().includes(lowerCaseQuery);
-      const contentMatch = textContent.toLowerCase().includes(lowerCaseQuery);
-      
-      return titleMatch || contentMatch;
+      const searchText = searchTextMap.get(note.id) || '';
+      return searchText.includes(lowerCaseQuery);
     });
-  }, [allNotes, activeFolderId, folders, searchQuery]);
+  }, [allNotes, activeFolderId, folders, debouncedSearchQuery, searchTextMap]);
 
   const handleSelectNote = (note: NoteWithFolder) => {
     setActiveNote(note);

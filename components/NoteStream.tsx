@@ -17,7 +17,7 @@ const getNoteTextPreview = (note: Note): string => {
     return getPlainText(textBlock?.content);
 }
 
-const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = ({ note, accentColor, showNoteColorLabels }) => {
+const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = React.memo(({ note, accentColor, showNoteColorLabels }) => {
   const textPreview = getNoteTextPreview(note);
 
   return (
@@ -36,9 +36,9 @@ const NotePreviewGrid: React.FC<{ note: Note; accentColor: string; showNoteColor
       </div>
     </div>
   );
-};
+});
 
-const NotePreviewList: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = ({ note, accentColor, showNoteColorLabels }) => {
+const NotePreviewList: React.FC<{ note: Note; accentColor: string; showNoteColorLabels: boolean; }> = React.memo(({ note, accentColor, showNoteColorLabels }) => {
     const textPreview = getNoteTextPreview(note);
   
     return (
@@ -57,7 +57,7 @@ const NotePreviewList: React.FC<{ note: Note; accentColor: string; showNoteColor
         </p>
       </div>
     );
-};
+});
 
 
 interface NoteCardProps {
@@ -69,7 +69,7 @@ interface NoteCardProps {
     showNoteColorLabels: boolean;
 }
 
-const NoteCard: React.FC<NoteCardProps> = ({ note, viewMode, onSelect, onTogglePin, onDelete, showNoteColorLabels }) => {
+const NoteCard: React.FC<NoteCardProps> = React.memo(({ note, viewMode, onSelect, onTogglePin, onDelete, showNoteColorLabels }) => {
     const commonButtonClasses = "p-2 bg-white/90 dark:bg-charcoal-dark/90 backdrop-blur-sm rounded-lg text-charcoal/50 dark:text-text-dark/50 transition-all duration-200 shadow-sm";
     const pinButtonClasses = `${commonButtonClasses} hover:bg-accent/10 hover:text-accent hover:scale-105`;
     const deleteButtonClasses = `${commonButtonClasses} hover:bg-coral/10 hover:text-coral hover:scale-105`;
@@ -137,7 +137,15 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, viewMode, onSelect, onToggleP
             )}
         </div>
     )
-};
+}, (prevProps, nextProps) =>
+  prevProps.note.id === nextProps.note.id &&
+  prevProps.note.updated_at === nextProps.note.updated_at &&
+  prevProps.note.is_pinned === nextProps.note.is_pinned &&
+  prevProps.note.folderId === nextProps.note.folderId &&
+  prevProps.note.folderColorIndex === nextProps.note.folderColorIndex &&
+  prevProps.viewMode === nextProps.viewMode &&
+  prevProps.showNoteColorLabels === nextProps.showNoteColorLabels
+);
 
 
 interface NoteStreamProps {

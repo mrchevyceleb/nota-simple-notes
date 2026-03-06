@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
 import { getPaperPatternStyles, LINE_COLOR_ON_LIGHT, LINE_COLOR_ON_DARK } from '../constants';
 import DrawingCanvas from './DrawingCanvas';
+import { sanitizeHtml } from '../utils/sanitize';
 import { useTheme } from '../hooks/useTheme';
 
 interface NoteCanvasProps {
@@ -291,6 +292,28 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
     setScale(1);
   }, []);
 
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isModKey = e.ctrlKey || e.metaKey;
+      if (!isModKey) return;
+
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        handleZoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleZoomIn, handleZoomOut, handleResetZoom]);
+
   // Handle canvas click for text tool (create new text block)
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isTextToolActive || !paperRef.current) return;
@@ -336,6 +359,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleZoomOut}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Zoom Out"
+          aria-label="Zoom out"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -345,6 +369,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleResetZoom}
           className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
           title="Reset Zoom"
+          aria-label="Reset zoom"
         >
           {Math.round(scale * 100)}%
         </button>
@@ -352,6 +377,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleZoomIn}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Zoom In"
+          aria-label="Zoom in"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -441,7 +467,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                     };
                     onBlockUpdate(updatedBlock);
                   }}
-                  dangerouslySetInnerHTML={{ __html: block.content }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.content) }}
                   data-placeholder="Start typing..."
                   className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
                     ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}

@@ -35,7 +35,7 @@ interface NavItemProps {
     onDropNote: (noteId: string, folderId: string) => void;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ folder, index, totalFolders, isActive, onSelectFolder, onOpenActionMenu, onMoveFolder, onDropNote }) => {
+const NavItem: React.FC<NavItemProps> = React.memo(({ folder, index, totalFolders, isActive, onSelectFolder, onOpenActionMenu, onMoveFolder, onDropNote }) => {
     const color = FOLDER_COLORS[folder.color_index ?? index % FOLDER_COLORS.length];
     const [isDragOver, setIsDragOver] = useState(false);
 
@@ -107,7 +107,7 @@ const NavItem: React.FC<NavItemProps> = ({ folder, index, totalFolders, isActive
             </div>
         </div>
     )
-};
+});
 
 const Sidebar: React.FC<SidebarProps> = ({ folders, activeFolderId, onSelectFolder, onAddFolder, onDeleteFolder, onUpdateFolder, onReorderFolders, isOpen, onClose, userEmail, theme, onToggleTheme, showNoteColorLabels, onToggleNoteColorLabels, onMoveNote }) => {
     const [newFolderName, setNewFolderName] = useState('');
