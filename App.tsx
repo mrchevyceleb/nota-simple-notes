@@ -12,7 +12,6 @@ import { useTheme } from './hooks/useTheme';
 import { useViewMode } from './hooks/useViewMode';
 import { FOLDER_COLOR_VALUES } from './constants';
 import { useNoteColorLabels } from './hooks/useNoteColorLabels';
-import PWAStatus from './components/PWAStatus';
 
 interface Toast {
   id: number;
@@ -134,7 +133,6 @@ const App: React.FC = () => {
   return (
     <>
       {content}
-      <PWAStatus />
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   );
