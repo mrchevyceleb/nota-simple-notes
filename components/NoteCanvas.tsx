@@ -64,6 +64,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   const paperRef = useRef<HTMLDivElement>(null);
   const textBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousBlocksRef = useRef<CanvasBlock[]>([]);
+  const hasAutoFocusedRef = useRef(false);
   // Tool state checks - define these early so they can be used in effects
   const isDrawingToolActive = useMemo(
     () => [Tool.Pen, Tool.Highlighter, Tool.Eraser].includes(activeTool),
@@ -156,6 +157,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   }, []);
 
   // Auto-focus first text block when note loads (if text tool is active)
+  // Only trigger on mount, tool change, or block structure change - NOT on content updates
   useEffect(() => {
     if (!isTextToolActive || textBlocks.length === 0) return;
 
@@ -163,30 +165,27 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
     const currentBlockIds = textBlocks.map(b => b.id).join(',');
     const previousBlockIds = previousBlocksRef.current.map((b) => b.id).join(',');
 
+    // Only auto-focus when block structure changes (new/deleted blocks), not content updates
     if (firstTextBlock && currentBlockIds !== previousBlockIds) {
       previousBlocksRef.current = blocks;
       const timeoutId = setTimeout(() => {
         const element = textBlockRefs.current.get(firstTextBlock.id);
-        if (element && document.activeElement !== element) {
-          try {
-            element.focus();
-            const selection = window.getSelection();
-            if (selection) {
-              const range = document.createRange();
-              range.selectNodeContents(element);
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            }
-          } catch (e) {
-            console.error('Auto-focus error:', e);
+        if (element) {
+          element.focus();
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
           }
         }
-      }, 200);
+      }, 100);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [isTextToolActive, textBlocks, blocks]);
+  }, [isTextToolActive, textBlocks.length]);
 
   // Drawing canvas virtualization (segments)
   const numSegments = Math.ceil(canvasBounds.height / SEGMENT_HEIGHT);
@@ -426,7 +425,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               <div
                 key={block.id}
                 data-text-block
-                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-auto'}`}
+                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-none'}`}
                 style={{
                   left: `${block.x}px`,
                   top: `${block.y}px`,
@@ -435,10 +434,19 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   zIndex: block.zIndex,
                 }}
                 onMouseDown={(e) => {
-                  if (!isTextToolActive) handleBlockDragStart(e, block);
+                  if (isTextToolActive) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  } else {
+                    handleBlockDragStart(e, block);
+                  }
                 }}
                 onTouchStart={(e) => {
-                  if (!isTextToolActive) handleBlockDragStart(e, block);
+                  if (isTextToolActive) {
+                    e.stopPropagation();
+                  } else {
+                    handleBlockDragStart(e, block);
+                  }
                 }}
               >
                 <div
@@ -451,11 +459,30 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   }}
                   contentEditable={isTextToolActive}
                   suppressContentEditableWarning
+                  onMouseDown={(e) => {
+                    if (isTextToolActive) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }
+                  }}
                   onClick={(e) => {
                     if (isTextToolActive) {
+                      e.preventDefault();
                       e.stopPropagation();
                       setFocusedTextBlockId(block.id);
-                      (e.currentTarget as HTMLElement).focus();
+                      // Use requestAnimationFrame to ensure focus happens after event cycle
+                      requestAnimationFrame(() => {
+                        const target = e.currentTarget as HTMLElement;
+                        target.focus();
+                        // Move cursor to end
+                        const selection = window.getSelection();
+                        if (selection && selection.rangeCount > 0) {
+                          const range = selection.getRangeAt(0);
+                          range.collapse(false);
+                          selection.removeAllRanges();
+                          selection.addRange(range);
+                        }
+                      });
                     }
                   }}
                   onFocus={() => setFocusedTextBlockId(block.id)}
@@ -472,6 +499,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
                     ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
                     ${isTextToolActive ? 'cursor-text' : 'cursor-default'}`}
+                  style={{ userSelect: 'text' } as React.CSSProperties}
                 />
               </div>
             ))}
