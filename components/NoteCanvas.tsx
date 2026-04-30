@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
 import { getPaperPatternStyles, LINE_COLOR_ON_LIGHT, LINE_COLOR_ON_DARK } from '../constants';
 import DrawingCanvas from './DrawingCanvas';
-import { sanitizeHtml } from '../utils/sanitize';
+import EditableTextBlock from './editor/EditableTextBlock';
 import { useTheme } from '../hooks/useTheme';
 
 interface NoteCanvasProps {
@@ -435,7 +435,6 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                 }}
                 onMouseDown={(e) => {
                   if (isTextToolActive) {
-                    e.preventDefault();
                     e.stopPropagation();
                   } else {
                     handleBlockDragStart(e, block);
@@ -449,57 +448,20 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                   }
                 }}
               >
-                <div
-                  ref={(el) => {
-                    if (el) {
-                      textBlockRefs.current.set(block.id, el);
-                    } else {
-                      textBlockRefs.current.delete(block.id);
-                    }
-                  }}
-                  contentEditable={isTextToolActive}
-                  suppressContentEditableWarning
-                  onMouseDown={(e) => {
-                    if (isTextToolActive) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }
-                  }}
-                  onClick={(e) => {
-                    if (isTextToolActive) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setFocusedTextBlockId(block.id);
-                      // Use requestAnimationFrame to ensure focus happens after event cycle
-                      requestAnimationFrame(() => {
-                        const target = e.currentTarget as HTMLElement;
-                        target.focus();
-                        // Move cursor to end
-                        const selection = window.getSelection();
-                        if (selection && selection.rangeCount > 0) {
-                          const range = selection.getRangeAt(0);
-                          range.collapse(false);
-                          selection.removeAllRanges();
-                          selection.addRange(range);
-                        }
-                      });
-                    }
-                  }}
+                <EditableTextBlock
+                  block={block}
+                  isTextToolActive={isTextToolActive}
+                  fontSizeClass={fontSizeClass}
+                  onUpdate={onBlockUpdate}
                   onFocus={() => setFocusedTextBlockId(block.id)}
                   onBlur={() => setFocusedTextBlockId(null)}
-                  onInput={(e) => {
-                    const updatedBlock: CanvasTextBlock = {
-                      ...block,
-                      content: e.currentTarget.innerHTML,
-                    };
-                    onBlockUpdate(updatedBlock);
+                  registerRef={(id, el) => {
+                    if (el) {
+                      textBlockRefs.current.set(id, el);
+                    } else {
+                      textBlockRefs.current.delete(id);
+                    }
                   }}
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.content) }}
-                  data-placeholder="Start typing..."
-                  className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
-                    ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
-                    ${isTextToolActive ? 'cursor-text' : 'cursor-default'}`}
-                  style={{ userSelect: 'text' } as React.CSSProperties}
                 />
               </div>
             ))}
