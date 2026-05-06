@@ -1,58 +1,29 @@
-# Nota — Simple Notes
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-A dead-simple, cross-platform note-taking app inspired by Notability and Google Keep. Supports text, handwriting, images, and audio recordings with a clean, paper-like aesthetic.
+# Nota - Simple Notes
 
-## Features
+A clean, minimal note-taking app with folders, canvas drawing, and real-time sync powered by Supabase.
 
-- 📝 Unified infinite canvas — type and draw on the same surface
-- 🖊️ Pen, highlighter, and eraser tools with pressure-like rendering
-- 🗂️ Folders with color labels and drag-to-reorder
-- 📌 Pin important notes to the top
-- 🌙 Dark mode
-- 📴 Offline-ready (PWA)
-- ☁️ Synced via Supabase
+## Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env` and fill in your Supabase credentials (source from Doppler):
+   ```
+   cp .env.example .env
+   ```
+4. Start development server: `npm run dev`
+5. Build for production: `npm run build`
+6. Start production server: `npm start`
 
 ## Run Locally
 
-**Prerequisites:** Node.js, a [Supabase](https://supabase.com) project
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   ```
-   npm install
-   ```
-
-2. Create a `.env.local` file in the project root with your Supabase credentials:
-   ```
-   VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
-   VITE_SUPABASE_ANON_KEY=<your-anon-key>
-   ```
-   You can find these values in your Supabase project under **Settings → API**.
-
-3. Run the development server:
-   ```
-   npm run dev
-   ```
-
-## Deploy
-
-1. Build the project:
-   ```
-   npm run build
-   ```
-
-2. Start the production server:
-   ```
-   npm start
-   ```
-   The server serves the built `dist/` folder and handles SPA routing.
-
-   Set the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` environment variables on your hosting platform before deploying.
-
-## Database Setup
-
-The app expects the following Supabase tables:
-
-- **`folders`** – `id`, `user_id`, `name`, `color_index`, `created_at`
-- **`notes`** – `id`, `user_id`, `folder_id`, `title`, `content` (jsonb), `paper_style`, `paper_color`, `font_size`, `is_pinned`, `created_at`, `updated_at`
-
-Row-Level Security (RLS) should be enabled on both tables with policies that restrict access to `auth.uid() = user_id`.
+   `npm install`
+2. Copy `.env.example` to `.env` and configure your Supabase credentials
+3. Run the app:
+   `npm run dev`
