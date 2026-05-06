@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
 import { getPaperPatternStyles, LINE_COLOR_ON_LIGHT, LINE_COLOR_ON_DARK } from '../constants';
 import DrawingCanvas from './DrawingCanvas';
+import EditableTextBlock from './editor/EditableTextBlock';
 import { useTheme } from '../hooks/useTheme';
 
 interface NoteCanvasProps {
@@ -64,8 +64,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   const paperRef = useRef<HTMLDivElement>(null);
   const textBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const previousBlocksRef = useRef<CanvasBlock[]>([]);
-  const transformRef = useRef<ReactZoomPanPinchRef>(null);
-
+  const hasAutoFocusedRef = useRef(false);
   // Tool state checks - define these early so they can be used in effects
   const isDrawingToolActive = useMemo(
     () => [Tool.Pen, Tool.Highlighter, Tool.Eraser].includes(activeTool),
@@ -158,6 +157,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   }, []);
 
   // Auto-focus first text block when note loads (if text tool is active)
+  // Only trigger on mount, tool change, or block structure change - NOT on content updates
   useEffect(() => {
     if (!isTextToolActive || textBlocks.length === 0) return;
 
@@ -165,30 +165,27 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
     const currentBlockIds = textBlocks.map(b => b.id).join(',');
     const previousBlockIds = previousBlocksRef.current.map((b) => b.id).join(',');
 
+    // Only auto-focus when block structure changes (new/deleted blocks), not content updates
     if (firstTextBlock && currentBlockIds !== previousBlockIds) {
       previousBlocksRef.current = blocks;
       const timeoutId = setTimeout(() => {
         const element = textBlockRefs.current.get(firstTextBlock.id);
-        if (element && document.activeElement !== element) {
-          try {
-            element.focus();
-            const selection = window.getSelection();
-            if (selection) {
-              const range = document.createRange();
-              range.selectNodeContents(element);
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            }
-          } catch (e) {
-            console.error('Auto-focus error:', e);
+        if (element) {
+          element.focus();
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
           }
         }
-      }, 200);
+      }, 100);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [isTextToolActive, textBlocks, blocks]);
+  }, [isTextToolActive, textBlocks.length]);
 
   // Drawing canvas virtualization (segments)
   const numSegments = Math.ceil(canvasBounds.height / SEGMENT_HEIGHT);
@@ -283,24 +280,38 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {
-    transformRef.current?.zoomIn(0.3);
+    setScale(prev => Math.min(3, prev + 0.1));
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    transformRef.current?.zoomOut(0.3);
+    setScale(prev => Math.max(0.1, prev - 0.1));
   }, []);
 
   const handleResetZoom = useCallback(() => {
-    transformRef.current?.resetTransform();
+    setScale(1);
   }, []);
 
-  // Handle transform changes to track scale
-  const handleTransformChange = useCallback((ref: ReactZoomPanPinchRef) => {
-    setScale(ref.state.scale);
-  }, []);
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isModKey = e.ctrlKey || e.metaKey;
+      if (!isModKey) return;
 
-  // Panning is enabled with Hand tool or when not using drawing/text tools
-  const isPanningEnabled = isHandToolActive || (!isDrawingToolActive && !isTextToolActive);
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        handleZoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleZoomIn, handleZoomOut, handleResetZoom]);
 
   // Handle canvas click for text tool (create new text block)
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -347,6 +358,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleZoomOut}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Zoom Out"
+          aria-label="Zoom out"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -356,6 +368,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleResetZoom}
           className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
           title="Reset Zoom"
+          aria-label="Reset zoom"
         >
           {Math.round(scale * 100)}%
         </button>
@@ -363,6 +376,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
           onClick={handleZoomIn}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Zoom In"
+          aria-label="Zoom in"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -370,26 +384,15 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
         </button>
       </div>
 
-      <TransformWrapper
-        ref={transformRef}
-        initialScale={1}
-        minScale={0.1}
-        maxScale={3}
-        limitToBounds={false}
-        panning={{ disabled: !isPanningEnabled }}
-        onTransformed={handleTransformChange}
-        wheel={{ step: 0.1 }}
-      >
-        <TransformComponent
-          wrapperStyle={{ width: '100%', height: '100%', overflow: 'visible' }}
-          contentStyle={{ width: canvasBounds.width, height: canvasBounds.height }}
-        >
+      <div className="flex-1 overflow-auto">
           <div
             ref={paperRef}
             style={{
               ...paperStyleProps,
               width: `${canvasBounds.width}px`,
               height: `${canvasBounds.height}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
             }}
             className={`relative transition-all duration-200 ${isHandToolActive ? 'cursor-grab' : ''} ${dragState.blockId ? 'cursor-grabbing' : ''}`}
             onClick={handleCanvasClick}
@@ -422,7 +425,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               <div
                 key={block.id}
                 data-text-block
-                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-auto'}`}
+                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-none'}`}
                 style={{
                   left: `${block.x}px`,
                   top: `${block.y}px`,
@@ -432,63 +435,33 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
                 }}
                 onMouseDown={(e) => {
                   if (isTextToolActive) {
-                    // Stop propagation so react-zoom-pan-pinch doesn't intercept
-                    // the mousedown and prevent focus on the contentEditable element
                     e.stopPropagation();
-                    return;
+                  } else {
+                    handleBlockDragStart(e, block);
                   }
-                  handleBlockDragStart(e, block);
                 }}
                 onTouchStart={(e) => {
                   if (isTextToolActive) {
                     e.stopPropagation();
-                    return;
+                  } else {
+                    handleBlockDragStart(e, block);
                   }
-                  handleBlockDragStart(e, block);
                 }}
               >
-                <div
-                  ref={(el) => {
-                    if (el) {
-                      textBlockRefs.current.set(block.id, el);
-                    } else {
-                      textBlockRefs.current.delete(block.id);
-                    }
-                  }}
-                  contentEditable={isTextToolActive}
-                  suppressContentEditableWarning
-                  onMouseDown={(e) => {
-                    if (isTextToolActive) {
-                      // Prevent react-zoom-pan-pinch from stealing focus
-                      e.stopPropagation();
-                    }
-                  }}
-                  onTouchStart={(e) => {
-                    if (isTextToolActive) {
-                      e.stopPropagation();
-                    }
-                  }}
-                  onClick={(e) => {
-                    if (isTextToolActive) {
-                      e.stopPropagation();
-                      setFocusedTextBlockId(block.id);
-                      (e.currentTarget as HTMLElement).focus();
-                    }
-                  }}
+                <EditableTextBlock
+                  block={block}
+                  isTextToolActive={isTextToolActive}
+                  fontSizeClass={fontSizeClass}
+                  onUpdate={onBlockUpdate}
                   onFocus={() => setFocusedTextBlockId(block.id)}
                   onBlur={() => setFocusedTextBlockId(null)}
-                  onInput={(e) => {
-                    const updatedBlock: CanvasTextBlock = {
-                      ...block,
-                      content: e.currentTarget.innerHTML,
-                    };
-                    onBlockUpdate(updatedBlock);
+                  registerRef={(id, el) => {
+                    if (el) {
+                      textBlockRefs.current.set(id, el);
+                    } else {
+                      textBlockRefs.current.delete(id);
+                    }
                   }}
-                  dangerouslySetInnerHTML={{ __html: block.content }}
-                  data-placeholder="Start typing..."
-                  className={`prose prose-stone dark:prose-invert prose-img:rounded-xl prose-img:shadow-md prose-img:my-4 w-full max-w-4xl focus:outline-none font-body break-words min-h-[3em] rounded-md transition-all ${fontSizeClass}
-                    ${!block.content ? "before:content-[attr(data-placeholder)] before:text-charcoal/30 dark:before:text-text-dark/40 before:pointer-events-none p-2 border-2 border-dashed border-charcoal/10 dark:border-text-dark/10" : ""}
-                    ${isTextToolActive ? 'cursor-text' : 'cursor-default'}`}
                 />
               </div>
             ))}
@@ -534,8 +507,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               </div>
             )}
           </div>
-        </TransformComponent>
-      </TransformWrapper>
+      </div>
     </div>
   );
 };

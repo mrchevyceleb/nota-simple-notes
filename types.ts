@@ -85,6 +85,7 @@ export interface Note {
   paper_color: 'white' | 'yellow';
   font_size: FontSize;
   is_pinned?: boolean;
+  user_id?: string;
 }
 
 export interface Folder {
