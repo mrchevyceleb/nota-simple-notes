@@ -1,9 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Folder, Note, PaperStyle, CanvasTextBlock } from '../types';
 import { supabase } from '../supabaseClient';
 import { Session, User, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 const FOLDER_ORDER_KEY = 'nota-folder-order';
+
+type FolderRow = Omit<Folder, 'notes'>;
+
+const UNIQUE_VIOLATION = '23505';
+
+const createQuickNotesFolder = async (userId: string) => {
+    const { error } = await supabase.from('folders').insert({ name: 'Quick Notes', user_id: userId });
+    if (error && error.code !== UNIQUE_VIOLATION) throw error;
+};
 
 const getFoldersWithNotes = async (user: User): Promise<Folder[]> => {
     // Parallelize fetching for performance
@@ -18,9 +27,10 @@ const getFoldersWithNotes = async (user: User): Promise<Folder[]> => {
     if (foldersError) throw foldersError;
     if (notesError) throw notesError;
 
-    const folders: Folder[] = foldersData.map(f => ({
+    const notes = notesData as unknown as Note[];
+    const folders: Folder[] = (foldersData as unknown as FolderRow[]).map(f => ({
         ...f,
-        notes: notesData.filter(n => n.folder_id === f.id) as Note[],
+        notes: notes.filter(n => n.folder_id === f.id),
     }));
     
     // Apply local storage order if it exists
@@ -49,29 +59,34 @@ export const useNoteTaker = (session: Session | null) => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const fetchedUserId = useRef<string | null>(null);
-  
+
   const user = session?.user;
   const userId = user?.id;
 
   useEffect(() => {
+    if (!user) {
+      setFolders([]);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     const fetchData = async () => {
-      if (!user) return;
       try {
         setError(null);
         setLoading(true);
         const data = await getFoldersWithNotes(user);
+        if (cancelled) return;
         if (data.length === 0) {
-          // Create a default folder if none exist
-          const { data: newFolderData } = await supabase.from('folders').insert({ name: 'Quick Notes', user_id: user.id }).select().single();
-          if (newFolderData) {
-              const defaultFolder: Folder = { ...newFolderData, notes: [] };
-              setFolders([defaultFolder]);
-          }
+          await createQuickNotesFolder(user.id);
+          if (cancelled) return;
+          const reloaded = await getFoldersWithNotes(user);
+          if (!cancelled) setFolders(reloaded);
         } else {
           setFolders(data);
         }
       } catch (error) {
+        if (cancelled) return;
         const errorMessage = error && typeof error === 'object' && 'message' in error
           ? (error as { message: string }).message
           : String(error);
@@ -85,21 +100,15 @@ export const useNoteTaker = (session: Session | null) => {
           setError('An unexpected error occurred while loading your notes.');
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    if (userId && userId !== fetchedUserId.current) {
-        fetchData();
-        fetchedUserId.current = userId;
-    } else if (!userId) {
-        setFolders([]);
-        fetchedUserId.current = null;
-        setLoading(false); 
-    } else {
-        setLoading(false);
-    }
-  }, [userId]); 
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
   
 
   useEffect(() => {
@@ -185,8 +194,8 @@ export const useNoteTaker = (session: Session | null) => {
   }, [userId]); 
 
 
-  const addFolder = useCallback(async (name: string) => {
-    if (!user) return;
+  const addFolder = useCallback(async (name: string): Promise<string | null> => {
+    if (!user) return null;
     
     const { data, error } = await supabase
         .from('folders')
@@ -197,11 +206,13 @@ export const useNoteTaker = (session: Session | null) => {
     if (error) {
         console.error("Error adding folder:", error.message);
         console.error(`Failed to create folder: ${error.message}`);
-        return;
+        return error.code === UNIQUE_VIOLATION
+            ? `You already have a folder named "${name}".`
+            : `Could not create folder: ${error.message}`;
     }
     
     if (data) {
-        const newFolder = { ...(data as Folder), notes: [] };
+        const newFolder: Folder = { ...(data as unknown as FolderRow), notes: [] };
         setFolders(currentFolders => {
             if (currentFolders.some(f => f.id === newFolder.id)) {
                 return currentFolders;
@@ -211,6 +222,7 @@ export const useNoteTaker = (session: Session | null) => {
             return updatedFolders;
         });
     }
+    return null;
   }, [user]);
   
   const deleteFolder = useCallback(async (folderId: string) => {
@@ -241,17 +253,31 @@ export const useNoteTaker = (session: Session | null) => {
     }
   }, [folders]);
 
-  const updateFolder = useCallback(async (folderId: string, updates: Partial<Pick<Folder, 'name' | 'color_index'>>) => {
+  const updateFolder = useCallback(async (folderId: string, updates: Partial<Pick<Folder, 'name' | 'color_index'>>): Promise<string | null> => {
+    const previous = folders.find(f => f.id === folderId);
     setFolders(currentFolders =>
         currentFolders.map(f =>
             f.id === folderId ? { ...f, ...updates } : f
         )
     );
     const { error } = await supabase.from('folders').update(updates).eq('id', folderId);
-    if (error) {
-        console.error('Error updating folder:', error.message);
+    if (!error) return null;
+    console.error('Error updating folder:', error.message);
+    if (previous) {
+        setFolders(currentFolders =>
+            currentFolders.map(f => {
+                if (f.id !== folderId) return f;
+                const reverted = { ...f };
+                if (updates.name !== undefined && f.name === updates.name) reverted.name = previous.name;
+                if (updates.color_index !== undefined && f.color_index === updates.color_index) reverted.color_index = previous.color_index;
+                return reverted;
+            })
+        );
     }
-  }, []);
+    return error.code === UNIQUE_VIOLATION && updates.name
+        ? `You already have a folder named "${updates.name}".`
+        : `Could not update folder: ${error.message}`;
+  }, [folders]);
 
   const reorderFolders = useCallback((reorderedFolders: Folder[]) => {
       setFolders(reorderedFolders);
@@ -299,7 +325,7 @@ export const useNoteTaker = (session: Session | null) => {
         return null;
     }
 
-    const newNote = data as Note;
+    const newNote = data as unknown as Note;
     
     setFolders(currentFolders => {
         return currentFolders.map(folder => {

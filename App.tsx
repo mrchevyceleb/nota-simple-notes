@@ -127,7 +127,7 @@ const App: React.FC = () => {
   } else if (!session) {
     content = <Auth />;
   } else {
-    content = <NotaApp session={session} />;
+    content = <NotaApp session={session} onToast={addToast} />;
   }
 
   return (
@@ -140,9 +140,10 @@ const App: React.FC = () => {
 
 interface NotaAppProps {
   session: Session;
+  onToast: (message: string) => void;
 }
 
-const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
+const NotaApp: React.FC<NotaAppProps> = ({ session, onToast }) => {
   const { folders, loading, error: noteTakerError, addFolder, deleteFolder, updateFolder, reorderFolders, addNote, deleteNote, updateNote, togglePinNote, moveNote } = useNoteTaker(session);
   const [theme, toggleTheme] = useTheme();
   const [viewMode, toggleViewMode] = useViewMode();
@@ -386,9 +387,15 @@ const NotaApp: React.FC<NotaAppProps> = ({ session }) => {
                     setActiveFolderId(folderId);
                     setIsSidebarOpen(false);
                 }}
-                onAddFolder={addFolder}
+                onAddFolder={async (name) => {
+                    const message = await addFolder(name);
+                    if (message) onToast(message);
+                }}
                 onDeleteFolder={deleteFolder}
-                onUpdateFolder={updateFolder}
+                onUpdateFolder={async (folderId, updates) => {
+                    const message = await updateFolder(folderId, updates);
+                    if (message) onToast(message);
+                }}
                 onReorderFolders={reorderFolders}
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}

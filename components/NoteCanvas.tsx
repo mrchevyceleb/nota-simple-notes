@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
+import { AudioBlock, CanvasBlock, CanvasTextBlock, CanvasDrawingBlock, CanvasImageBlock, Tool, DrawingPath, PaperStyle } from '../types';
 import { getPaperPatternStyles, LINE_COLOR_ON_LIGHT, LINE_COLOR_ON_DARK } from '../constants';
 import DrawingCanvas from './DrawingCanvas';
 import EditableTextBlock from './editor/EditableTextBlock';
@@ -91,7 +91,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   );
 
   const audioBlocks = useMemo(
-    () => (blocks || []).filter(b => b && b.type === 'audio'),
+    () => (blocks || []).filter(b => b && b.type === 'audio') as AudioBlock[],
     [blocks]
   );
 
