@@ -25,6 +25,16 @@ const SEGMENT_HEIGHT = 1200;
 const CANVAS_PADDING = 500;
 const MIN_CANVAS_SIZE = { width: 1600, height: 2000 };
 
+const focusTextBlockAtEnd = (element: HTMLElement) => {
+  element.focus();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+};
+
 interface DragState {
   blockId: string | null;
   startX: number;
@@ -63,8 +73,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
   const mainRef = useRef<HTMLDivElement | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
   const textBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const previousBlocksRef = useRef<CanvasBlock[]>([]);
-  const hasAutoFocusedRef = useRef(false);
+  const focusFirstBlockPendingRef = useRef(false);
   // Tool state checks - define these early so they can be used in effects
   const isDrawingToolActive = useMemo(
     () => [Tool.Pen, Tool.Highlighter, Tool.Eraser].includes(activeTool),
@@ -156,36 +165,22 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Auto-focus first text block when note loads (if text tool is active)
-  // Only trigger on mount, tool change, or block structure change - NOT on content updates
+  // Focus the first text block when the Text tool is switched on. New blocks focus themselves on creation.
   useEffect(() => {
-    if (!isTextToolActive || textBlocks.length === 0) return;
+    focusFirstBlockPendingRef.current = isTextToolActive;
+  }, [isTextToolActive]);
 
+  useEffect(() => {
     const firstTextBlock = textBlocks[0];
-    const currentBlockIds = textBlocks.map(b => b.id).join(',');
-    const previousBlockIds = previousBlocksRef.current.map((b) => b.id).join(',');
-
-    // Only auto-focus when block structure changes (new/deleted blocks), not content updates
-    if (firstTextBlock && currentBlockIds !== previousBlockIds) {
-      previousBlocksRef.current = blocks;
-      const timeoutId = setTimeout(() => {
-        const element = textBlockRefs.current.get(firstTextBlock.id);
-        if (element) {
-          element.focus();
-          const selection = window.getSelection();
-          if (selection) {
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          }
-        }
-      }, 100);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isTextToolActive, textBlocks.length]);
+    if (!isTextToolActive || !focusFirstBlockPendingRef.current || !firstTextBlock) return;
+    const timeoutId = setTimeout(() => {
+      const element = textBlockRefs.current.get(firstTextBlock.id);
+      if (!element) return;
+      focusFirstBlockPendingRef.current = false;
+      focusTextBlockAtEnd(element);
+    }, 100);
+    return () => clearTimeout(timeoutId);
+  }, [isTextToolActive, textBlocks]);
 
   // Drawing canvas virtualization (segments)
   const numSegments = Math.ceil(canvasBounds.height / SEGMENT_HEIGHT);
@@ -339,7 +334,10 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
     };
 
     onBlockAdd(newTextBlock);
-    setFocusedTextBlockId(newTextBlock.id);
+    requestAnimationFrame(() => {
+      const element = textBlockRefs.current.get(newTextBlock.id);
+      if (element) focusTextBlockAtEnd(element);
+    });
   }, [isTextToolActive, editorWidth, scale, onBlockAdd]);
 
   return (
@@ -425,7 +423,7 @@ const NoteCanvas: React.FC<NoteCanvasProps> = ({
               <div
                 key={block.id}
                 data-text-block
-                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : 'pointer-events-none'}`}
+                className={`absolute px-4 md:px-8 py-8 ${isHandToolActive ? 'pointer-events-auto cursor-grab' : isTextToolActive ? 'pointer-events-auto' : 'pointer-events-none'}`}
                 style={{
                   left: `${block.x}px`,
                   top: `${block.y}px`,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, Note, PaperStyle, CanvasTextBlock } from '../types';
 import { supabase } from '../supabaseClient';
 import { Session, User, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
@@ -6,6 +6,8 @@ import { Session, User, RealtimePostgresChangesPayload } from '@supabase/supabas
 const FOLDER_ORDER_KEY = 'nota-folder-order';
 
 type FolderRow = Omit<Folder, 'notes'>;
+type FolderValues = Pick<FolderRow, 'name' | 'color_index'>;
+type FolderWrites = { pending: number; failed: boolean; seq: number; baseline: FolderValues | null };
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -57,6 +59,11 @@ const getFoldersWithNotes = async (user: User): Promise<Folder[]> => {
 
 export const useNoteTaker = (session: Session | null) => {
   const [folders, setFolders] = useState<Folder[]>([]);
+  const folderWrites = useRef(new Map<string, FolderWrites>());
+  const foldersRef = useRef(folders);
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -254,30 +261,51 @@ export const useNoteTaker = (session: Session | null) => {
   }, [folders]);
 
   const updateFolder = useCallback(async (folderId: string, updates: Partial<Pick<Folder, 'name' | 'color_index'>>): Promise<string | null> => {
-    const previous = folders.find(f => f.id === folderId);
+    const writes = folderWrites.current.get(folderId) ?? { pending: 0, failed: false, seq: 0, baseline: null };
+    folderWrites.current.set(folderId, writes);
+    if (writes.pending === 0) {
+      const current = foldersRef.current.find(f => f.id === folderId);
+      writes.baseline = current ? { name: current.name, color_index: current.color_index } : null;
+    }
+    writes.pending += 1;
+    writes.seq += 1;
+
     setFolders(currentFolders =>
         currentFolders.map(f =>
             f.id === folderId ? { ...f, ...updates } : f
         )
     );
     const { error } = await supabase.from('folders').update(updates).eq('id', folderId);
-    if (!error) return null;
-    console.error('Error updating folder:', error.message);
-    if (previous) {
-        setFolders(currentFolders =>
-            currentFolders.map(f => {
-                if (f.id !== folderId) return f;
-                const reverted = { ...f };
-                if (updates.name !== undefined && f.name === updates.name) reverted.name = previous.name;
-                if (updates.color_index !== undefined && f.color_index === updates.color_index) reverted.color_index = previous.color_index;
-                return reverted;
-            })
-        );
+
+    writes.pending -= 1;
+    if (error) {
+        console.error('Error updating folder:', error.message);
+        writes.failed = true;
+    } else if (writes.baseline) {
+        writes.baseline = {
+            name: updates.name ?? writes.baseline.name,
+            color_index: updates.color_index ?? writes.baseline.color_index,
+        };
     }
+    if (writes.pending === 0 && writes.failed) {
+        const seq = writes.seq;
+        const { data, error: readError } = await supabase.from('folders').select('name, color_index').eq('id', folderId).maybeSingle();
+        const fresh = !readError && data ? (data as unknown as FolderValues) : writes.baseline;
+        if (fresh && writes.seq === seq) {
+            writes.failed = false;
+            setFolders(currentFolders =>
+                currentFolders.map(f =>
+                    f.id === folderId ? { ...f, name: fresh.name, color_index: fresh.color_index } : f
+                )
+            );
+        }
+    }
+
+    if (!error) return null;
     return error.code === UNIQUE_VIOLATION && updates.name
         ? `You already have a folder named "${updates.name}".`
         : `Could not update folder: ${error.message}`;
-  }, [folders]);
+  }, []);
 
   const reorderFolders = useCallback((reorderedFolders: Folder[]) => {
       setFolders(reorderedFolders);

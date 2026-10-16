@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NoteWithFolder } from '../App';
 import { Note, TextBlock, CanvasTextBlock } from '../types';
 import { ICONS, FOLDER_COLOR_VALUES } from '../constants';
@@ -60,6 +61,9 @@ const NotePreviewList: React.FC<{ note: Note; accentColor: string; showNoteColor
 });
 
 
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
+
 interface NoteCardProps {
     note: NoteWithFolder;
     viewMode: ViewMode;
@@ -81,8 +85,79 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(({ note, viewMode, onSelect
         e.dataTransfer.effectAllowed = 'move';
     };
 
+    const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+    const pressTimer = useRef<number | null>(null);
+    const pressOrigin = useRef<{ x: number; y: number } | null>(null);
+    const longPressed = useRef(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => () => {
+        if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    }, []);
+
+    useEffect(() => {
+        if (!menu) return;
+        const previouslyFocused = document.activeElement as HTMLElement | null;
+        menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+        return () => previouslyFocused?.focus();
+    }, [menu]);
+
+    const cancelPress = () => {
+        if (pressTimer.current !== null) {
+            window.clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+    };
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        longPressed.current = false;
+        if (e.pointerType !== 'touch') return;
+        if ((e.target as HTMLElement).closest('.note-action-btn')) return;
+        const origin = { x: e.clientX, y: e.clientY };
+        pressOrigin.current = origin;
+        cancelPress();
+        pressTimer.current = window.setTimeout(() => {
+            pressTimer.current = null;
+            longPressed.current = true;
+            setMenu(origin);
+        }, LONG_PRESS_MS);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        const origin = pressOrigin.current;
+        if (origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > LONG_PRESS_MOVE_TOLERANCE_PX) {
+            cancelPress();
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        cancelPress();
+        setMenu({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            setMenu(null);
+            return;
+        }
+        const forward = e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey);
+        const backward = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+        if (!forward && !backward) return;
+        e.preventDefault();
+        const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+        const index = items.indexOf(document.activeElement as HTMLElement);
+        const next = index < 0 ? 0 : (index + (forward ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
+    };
+
     // Handle click on the card - separate from drag to ensure clicks work reliably
     const handleClick = (e: React.MouseEvent) => {
+        if (longPressed.current) {
+            longPressed.current = false;
+            return;
+        }
         // Don't trigger if clicking on action buttons
         if ((e.target as HTMLElement).closest('.note-action-btn')) {
             return;
@@ -96,6 +171,12 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(({ note, viewMode, onSelect
             draggable 
             onDragStart={handleDragStart}
             onClick={handleClick}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={cancelPress}
+            onPointerCancel={cancelPress}
+            onContextMenu={handleContextMenu}
+            style={{ WebkitTouchCallout: 'none' }}
         >
             <div 
                 className="w-full h-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent rounded-xl transform transition-transform duration-200 hover:-translate-y-1"
@@ -134,6 +215,44 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(({ note, viewMode, onSelect
                         {React.cloneElement(ICONS.pinFilled, {className: "h-4 w-4 text-accent"})}
                     </div>
                 </div>
+            )}
+            {menu && createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 z-[60]"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setMenu(null); }}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu(null); }}
+                    />
+                    <div
+                        ref={menuRef}
+                        role="menu"
+                        onKeyDown={handleMenuKeyDown}
+                        className="fixed z-[61] min-w-40 p-1.5 flex flex-col gap-1 rounded-xl bg-white dark:bg-charcoal-dark shadow-xl border border-charcoal/10 dark:border-text-dark/10"
+                        style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 176)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 110)) }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            role="menuitem"
+                            onClick={() => { setMenu(null); onTogglePin(note.id, note.folderId); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-charcoal dark:text-text-dark hover:bg-accent/10"
+                        >
+                            {React.cloneElement(note.is_pinned ? ICONS.pinFilled : ICONS.pin, {className: "h-4 w-4"})}
+                            {note.is_pinned ? 'Unpin note' : 'Pin note'}
+                        </button>
+                        <button
+                            role="menuitem"
+                            onClick={() => { setMenu(null); onDelete(); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-coral hover:bg-coral/10"
+                        >
+                            {React.cloneElement(ICONS.trash, {className: "h-4 w-4"})}
+                            Delete note
+                        </button>
+                    </div>
+                </>,
+                document.body
             )}
         </div>
     )
