@@ -7,7 +7,7 @@ const FOLDER_ORDER_KEY = 'nota-folder-order';
 
 type FolderRow = Omit<Folder, 'notes'>;
 type FolderValues = Pick<FolderRow, 'name' | 'color_index'>;
-type FolderWrites = { pending: number; failed: boolean; remoteSeq: number; batchRemoteSeq: number; baseline: FolderValues | null };
+type FolderWrites = { pending: number; failed: boolean; seq: number; remoteSeq: number; batchRemoteSeq: number; baseline: FolderValues | null };
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -267,7 +267,7 @@ export const useNoteTaker = (session: Session | null) => {
   }, [folders]);
 
   const updateFolder = useCallback(async (folderId: string, updates: Partial<Pick<Folder, 'name' | 'color_index'>>): Promise<string | null> => {
-    const writes = folderWrites.current.get(folderId) ?? { pending: 0, failed: false, remoteSeq: 0, batchRemoteSeq: 0, baseline: null };
+    const writes = folderWrites.current.get(folderId) ?? { pending: 0, failed: false, seq: 0, remoteSeq: 0, batchRemoteSeq: 0, baseline: null };
     folderWrites.current.set(folderId, writes);
     if (writes.pending === 0) {
       const current = foldersRef.current.find(f => f.id === folderId);
@@ -275,6 +275,7 @@ export const useNoteTaker = (session: Session | null) => {
       writes.batchRemoteSeq = writes.remoteSeq;
     }
     writes.pending += 1;
+    writes.seq += 1;
 
     setFolders(currentFolders =>
         currentFolders.map(f =>
@@ -295,11 +296,16 @@ export const useNoteTaker = (session: Session | null) => {
     }
     if (writes.pending === 0 && writes.failed) {
         writes.failed = false;
-        if (writes.baseline && writes.remoteSeq === writes.batchRemoteSeq) {
-            const reverted = writes.baseline;
+        const seq = writes.seq;
+        const remoteSeq = writes.remoteSeq;
+        const { data, error: readError } = await supabase.from('folders').select('name, color_index').eq('id', folderId).maybeSingle();
+        const fresh = !readError && data
+            ? (data as unknown as FolderValues)
+            : (writes.remoteSeq === writes.batchRemoteSeq ? writes.baseline : null);
+        if (fresh && writes.seq === seq && writes.remoteSeq === remoteSeq) {
             setFolders(currentFolders =>
                 currentFolders.map(f =>
-                    f.id === folderId ? { ...f, name: reverted.name, color_index: reverted.color_index } : f
+                    f.id === folderId ? { ...f, name: fresh.name, color_index: fresh.color_index } : f
                 )
             );
         }
