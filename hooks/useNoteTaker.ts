@@ -7,7 +7,7 @@ const FOLDER_ORDER_KEY = 'nota-folder-order';
 
 type FolderRow = Omit<Folder, 'notes'>;
 type FolderValues = Pick<FolderRow, 'name' | 'color_index'>;
-type FolderWrites = { pending: number; failed: boolean; seq: number; baseline: FolderValues | null };
+type FolderWrites = { pending: number; failed: boolean; remoteSeq: number; batchRemoteSeq: number; baseline: FolderValues | null };
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -126,6 +126,11 @@ export const useNoteTaker = (session: Session | null) => {
       const newRecord = 'new' in payload ? payload.new as unknown as Record<string, unknown> : undefined;
       const oldRecord = 'old' in payload ? payload.old as unknown as Record<string, unknown> : undefined;
 
+      if (table === 'folders' && eventType === 'UPDATE' && newRecord) {
+        const writes = folderWrites.current.get((newRecord as unknown as Folder).id);
+        if (writes) writes.remoteSeq += 1;
+      }
+
       setFolders(currentFolders => {
         // --- FOLDER CHANGES ---
         if (table === 'folders') {
@@ -137,7 +142,8 @@ export const useNoteTaker = (session: Session | null) => {
             return updatedFolders;
           }
           if (eventType === 'UPDATE' && newRecord) {
-            return currentFolders.map(f => f.id === (newRecord as unknown as Folder).id ? { ...f, ...newRecord } : f);
+            const folderId = (newRecord as unknown as Folder).id;
+            return currentFolders.map(f => f.id === folderId ? { ...f, ...newRecord } : f);
           }
           if (eventType === 'DELETE' && oldRecord) {
              const updatedFolders = currentFolders.filter(f => f.id !== (oldRecord as unknown as Folder).id);
@@ -261,14 +267,14 @@ export const useNoteTaker = (session: Session | null) => {
   }, [folders]);
 
   const updateFolder = useCallback(async (folderId: string, updates: Partial<Pick<Folder, 'name' | 'color_index'>>): Promise<string | null> => {
-    const writes = folderWrites.current.get(folderId) ?? { pending: 0, failed: false, seq: 0, baseline: null };
+    const writes = folderWrites.current.get(folderId) ?? { pending: 0, failed: false, remoteSeq: 0, batchRemoteSeq: 0, baseline: null };
     folderWrites.current.set(folderId, writes);
     if (writes.pending === 0) {
       const current = foldersRef.current.find(f => f.id === folderId);
       writes.baseline = current ? { name: current.name, color_index: current.color_index } : null;
+      writes.batchRemoteSeq = writes.remoteSeq;
     }
     writes.pending += 1;
-    writes.seq += 1;
 
     setFolders(currentFolders =>
         currentFolders.map(f =>
@@ -288,14 +294,12 @@ export const useNoteTaker = (session: Session | null) => {
         };
     }
     if (writes.pending === 0 && writes.failed) {
-        const seq = writes.seq;
-        const { data, error: readError } = await supabase.from('folders').select('name, color_index').eq('id', folderId).maybeSingle();
-        const fresh = !readError && data ? (data as unknown as FolderValues) : writes.baseline;
-        if (fresh && writes.seq === seq) {
-            writes.failed = false;
+        writes.failed = false;
+        if (writes.baseline && writes.remoteSeq === writes.batchRemoteSeq) {
+            const reverted = writes.baseline;
             setFolders(currentFolders =>
                 currentFolders.map(f =>
-                    f.id === folderId ? { ...f, name: fresh.name, color_index: fresh.color_index } : f
+                    f.id === folderId ? { ...f, name: reverted.name, color_index: reverted.color_index } : f
                 )
             );
         }
